@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { QrCode, RefreshCw } from "lucide-react";
+import QRCode from "qrcode";
 
 interface QRModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ interface QRModalProps {
 export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
   const { toast } = useToast();
   const [currentQRData, setCurrentQRData] = useState(qrData);
+  const [qrCodeDataURL, setQrCodeDataURL] = useState<string>("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const generateNewQRMutation = useMutation({
     mutationFn: async () => {
@@ -54,10 +57,32 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
     },
   });
 
+  // Generate QR code image when data changes
+  useEffect(() => {
+    if (currentQRData?.qrCode) {
+      QRCode.toDataURL(currentQRData.qrCode, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      })
+      .then(url => {
+        setQrCodeDataURL(url);
+      })
+      .catch(err => {
+        console.error('Error generating QR code:', err);
+      });
+    }
+  }, [currentQRData]);
+
   // Update currentQRData when qrData prop changes
-  if (qrData && qrData !== currentQRData) {
-    setCurrentQRData(qrData);
-  }
+  useEffect(() => {
+    if (qrData && qrData !== currentQRData) {
+      setCurrentQRData(qrData);
+    }
+  }, [qrData, currentQRData]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -70,22 +95,34 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
           {/* QR Code Display */}
           <div className="bg-white p-6 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
             <div className="text-center">
-              <div className="w-48 h-48 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                <div className="text-center">
-                  <QrCode size={64} className="text-gray-400 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500">QR Code</p>
+              {qrCodeDataURL ? (
+                <div className="flex flex-col items-center">
+                  <img 
+                    src={qrCodeDataURL} 
+                    alt="Check-in QR Code" 
+                    className="w-48 h-48 rounded-lg"
+                    data-testid="img-qr-code"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">Scan to Check-in</p>
                   {currentQRData?.qrCode && (
                     <p className="text-xs text-gray-400 mt-1 font-mono" data-testid="text-qr-code">
-                      {currentQRData.qrCode}
+                      ID: {currentQRData.qrCode.slice(-8)}
                     </p>
                   )}
                 </div>
-              </div>
+              ) : (
+                <div className="w-48 h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <div className="text-center">
+                    <QrCode size={64} className="text-gray-400 mx-auto mb-2" />
+                    <p className="text-xs text-gray-500">Generating QR Code...</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
           <p className="text-sm text-muted-foreground text-center">
-            Show this QR code to the receptionist to check in
+            Tunjukkan QR code ini ke resepsionis untuk check-in
           </p>
           
           <div className="flex gap-3 w-full">
