@@ -197,10 +197,15 @@ export class DatabaseStorage implements IStorage {
   async bookClass(booking: InsertClassBooking): Promise<ClassBooking> {
     const [newBooking] = await db.insert(classBookings).values(booking).returning();
     
-    // Update class enrollment count
+    // Update class enrollment count - get current count first
+    const currentBookings = await db
+      .select({ count: count() })
+      .from(classBookings)
+      .where(and(eq(classBookings.classId, booking.classId), eq(classBookings.status, "booked")));
+    
     await db
       .update(gymClasses)
-      .set({ currentEnrollment: count() })
+      .set({ currentEnrollment: currentBookings[0]?.count || 0 })
       .where(eq(gymClasses.id, booking.classId));
     
     return newBooking;

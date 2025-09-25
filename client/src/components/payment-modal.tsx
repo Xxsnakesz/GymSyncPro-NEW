@@ -215,8 +215,8 @@ export default function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl" data-testid="modal-payment">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] p-0 overflow-hidden" data-testid="modal-payment">
+        <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
           <div className="flex justify-between items-center">
             <DialogTitle>
               {step === 1 ? "Pilih Paket & Metode Pembayaran" : "Informasi Pembayaran"}
@@ -227,7 +227,8 @@ export default function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
           </div>
         </DialogHeader>
 
-        <div className="space-y-6 p-6">
+        <div className="overflow-y-auto flex-1 px-6 pb-6">
+          <div className="space-y-6">
           {step === 1 ? (
             <>
               {/* Plan Selection */}
@@ -499,6 +500,7 @@ export default function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
               )}
             </>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
