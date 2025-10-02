@@ -158,17 +158,38 @@ export default function MemberDashboard() {
     return `${hours}h ${minutes}m`;
   };
 
+  const getCrowdLevel = (count: number) => {
+    if (count < 10) return { level: "Low", color: "success-gradient", text: "Quiet time - perfect for workouts!" };
+    if (count < 25) return { level: "Medium", color: "warning-gradient", text: "Moderate crowd - good availability" };
+    return { level: "High", color: "danger-gradient", text: "Busy time - popular hours" };
+  };
+
+  const crowdCount = stats.currentCrowd || 0;
+  const crowdInfo = getCrowdLevel(crowdCount);
+
   return (
     <div className="min-h-screen bg-muted/30">
       <Navigation user={user} notificationCount={isExpiringSoon ? 1 : 0} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground">
-            Welcome back, {user.firstName || "Member"}!
-          </h2>
-          <p className="text-muted-foreground mt-1">Here's your fitness journey overview</p>
+        <div className="mb-8 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-bold text-foreground">
+              Welcome back, {user.firstName || "Member"}!
+            </h2>
+            <p className="text-muted-foreground mt-1">Here's your fitness journey overview</p>
+          </div>
+          <Button
+            onClick={() => generateQRMutation.mutate()}
+            disabled={generateQRMutation.isPending}
+            className="success-gradient text-white w-full sm:w-auto"
+            size="lg"
+            data-testid="button-generate-qr"
+          >
+            <QrCode size={20} className="mr-2" />
+            {generateQRMutation.isPending ? "Generating..." : "Generate Check-in QR"}
+          </Button>
         </div>
 
         {/* Expiring Membership Warning */}
@@ -251,17 +272,25 @@ export default function MemberDashboard() {
 
           <Card>
             <CardContent className="p-6">
-              <div className="w-full">
-                <p className="text-sm text-muted-foreground mb-2">Quick Check-in</p>
-                <Button
-                  onClick={() => generateQRMutation.mutate()}
-                  disabled={generateQRMutation.isPending}
-                  className="w-full success-gradient text-white"
-                  data-testid="button-generate-qr"
-                >
-                  <QrCode size={16} className="mr-2" />
-                  {generateQRMutation.isPending ? "Generating..." : "Generate QR"}
-                </Button>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Gym Crowd</p>
+                  <p className="text-2xl font-bold text-foreground" data-testid="text-crowd-count">
+                    {crowdCount}
+                  </p>
+                  <p className="text-xs text-muted-foreground">People now</p>
+                </div>
+                <div className={`${crowdInfo.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
+                  <Users className="text-white" size={20} />
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="flex items-center space-x-2">
+                  <Badge variant={crowdInfo.level === "Low" ? "default" : crowdInfo.level === "Medium" ? "secondary" : "destructive"}>
+                    {crowdInfo.level}
+                  </Badge>
+                  <p className="text-xs text-muted-foreground">{crowdInfo.text}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
