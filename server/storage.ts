@@ -49,6 +49,7 @@ export interface IStorage {
   getUserCheckIns(userId: string, limit?: number): Promise<CheckIn[]>;
   createCheckIn(checkIn: InsertCheckIn): Promise<CheckIn>;
   updateCheckOut(id: string): Promise<void>;
+  getCurrentCrowdCount(): Promise<number>;
   
   // Payment operations
   getUserPayments(userId: string): Promise<Payment[]>;
@@ -235,6 +236,15 @@ export class DatabaseStorage implements IStorage {
       .update(checkIns)
       .set({ checkOutTime: new Date(), status: "completed" })
       .where(eq(checkIns.id, id));
+  }
+
+  async getCurrentCrowdCount(): Promise<number> {
+    const result = await db
+      .select({ count: count() })
+      .from(checkIns)
+      .where(eq(checkIns.status, "active"));
+    
+    return result[0]?.count || 0;
   }
 
   // Payment operations
