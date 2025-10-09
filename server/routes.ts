@@ -332,6 +332,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Check-in routes
+  app.post('/api/admin/checkin/validate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { qrCode } = req.body;
+      if (!qrCode) {
+        return res.status(400).json({ message: 'QR code is required' });
+      }
+
+      const checkInData = await storage.validateCheckInQR(qrCode);
+      
+      if (!checkInData) {
+        return res.status(404).json({ message: 'Invalid or expired QR code' });
+      }
+
+      res.json(checkInData);
+    } catch (error) {
+      console.error("Error validating check-in:", error);
+      res.status(500).json({ message: "Failed to validate check-in" });
+    }
+  });
+
+  app.get('/api/admin/checkins', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      const checkIns = await storage.getRecentCheckIns(limit);
+      res.json(checkIns);
+    } catch (error) {
+      console.error("Error fetching check-ins:", error);
+      res.status(500).json({ message: "Failed to fetch check-ins" });
+    }
+  });
+
   // Indonesian Payment Gateway Routes
   
   // QRIS Payment
