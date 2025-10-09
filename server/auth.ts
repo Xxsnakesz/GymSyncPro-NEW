@@ -11,6 +11,16 @@ import { pool } from "./db";
 const PgSession = connectPgSimple(session);
 
 export async function setupAuth(app: Express) {
+  // Require SESSION_SECRET in production for security
+  const sessionSecret = process.env.SESSION_SECRET;
+  
+  if (!sessionSecret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SESSION_SECRET environment variable is required in production for secure session management");
+    }
+    console.warn("⚠️  WARNING: Using default SESSION_SECRET in development. Set SESSION_SECRET env var for production!");
+  }
+
   // Session setup
   app.use(
     session({
@@ -19,7 +29,7 @@ export async function setupAuth(app: Express) {
         tableName: "sessions",
         createTableIfMissing: false,
       }),
-      secret: process.env.SESSION_SECRET || "your-secret-key-change-in-production",
+      secret: sessionSecret || "dev-secret-change-in-production",
       resave: false,
       saveUninitialized: false,
       cookie: {

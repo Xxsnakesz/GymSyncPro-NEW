@@ -86,6 +86,8 @@ export default function AdminDashboard() {
   const filteredMembers = members?.filter((member: any) => {
     const matchesSearch = !searchTerm || 
       member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = memberFilter === "all" ||
@@ -271,6 +273,12 @@ export default function AdminDashboard() {
                             Member
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Username
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Phone
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Membership
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -302,6 +310,12 @@ export default function AdminDashboard() {
                                   <p className="text-sm text-muted-foreground">{member.email}</p>
                                 </div>
                               </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-foreground" data-testid={`text-username-${member.id}`}>
+                              {member.username || '-'}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-foreground" data-testid={`text-phone-${member.id}`}>
+                              {member.phone || '-'}
                             </td>
                             <td className="px-6 py-4 text-sm text-foreground">
                               {member.membership?.plan?.name || 'None'}
