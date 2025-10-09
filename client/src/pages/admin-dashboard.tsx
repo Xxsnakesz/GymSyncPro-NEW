@@ -25,6 +25,8 @@ import {
   QrCode,
   Clock,
   LogIn,
+  MessageSquare,
+  Star,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -66,6 +68,12 @@ export default function AdminDashboard() {
     enabled: isAuthenticated && user?.role === 'admin',
     retry: false,
     refetchInterval: 10000,
+  });
+
+  const { data: feedbacks } = useQuery({
+    queryKey: ["/api/admin/feedbacks"],
+    enabled: isAuthenticated && user?.role === 'admin',
+    retry: false,
   });
 
   if (isLoading || dashboardLoading) {
@@ -493,6 +501,97 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Member Feedback Section */}
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="text-primary" size={20} />
+                    Member Feedback
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">Review member suggestions and feedback</p>
+                </div>
+                <Badge variant="outline" className="text-sm" data-testid="text-feedback-count">
+                  {feedbacks?.length || 0} Total
+                </Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {!feedbacks || feedbacks.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <MessageSquare className="mx-auto mb-3" size={48} />
+                  <p className="text-lg font-medium">No Feedback Yet</p>
+                  <p className="text-sm mt-1">Member feedback will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {feedbacks.map((feedback: any) => (
+                    <div 
+                      key={feedback.id} 
+                      className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                      data-testid={`feedback-item-${feedback.id}`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={feedback.member?.profileImageUrl} />
+                            <AvatarFallback>
+                              {`${feedback.member?.firstName?.[0] || ''}${feedback.member?.lastName?.[0] || ''}`}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {feedback.member?.firstName} {feedback.member?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {feedback.member?.email}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                size={14}
+                                className={i < feedback.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}
+                              />
+                            ))}
+                          </div>
+                          <Badge variant="outline" className="ml-2">
+                            {feedback.category}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-muted/30 rounded-md p-3">
+                        <p className="text-sm text-foreground whitespace-pre-wrap">
+                          {feedback.message}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-3">
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(feedback.createdAt).toLocaleString('id-ID', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
