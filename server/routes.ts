@@ -85,24 +85,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { adminSecretKey, ...userData } = req.body;
       
+      console.log("Admin registration attempt:", { username: userData.username, email: userData.email });
+      
       // Check for admin secret key (you can set this in environment variables)
       // For now, we'll allow if the key is "admin123" or if ADMIN_SECRET_KEY env var matches
       const validSecretKey = process.env.ADMIN_SECRET_KEY || "admin123";
       
       if (adminSecretKey !== validSecretKey) {
+        console.log("Invalid admin secret key provided");
         return res.status(403).json({ message: "Invalid admin secret key" });
       }
       
+      // Validate data
       const validatedData = registerSchema.parse(userData);
+      console.log("Data validated successfully");
       
-      // Check if username or email already exists
-      const existingUser = await storage.getUserByUsername(validatedData.username);
-      if (existingUser) {
+      // Check if username already exists
+      const existingUsername = await storage.getUserByUsername(validatedData.username);
+      if (existingUsername) {
+        console.log("Username already exists:", validatedData.username);
         return res.status(400).json({ message: "Username sudah digunakan" });
+      }
+
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(validatedData.email);
+      if (existingEmail) {
+        console.log("Email already exists:", validatedData.email);
+        return res.status(400).json({ message: "Email sudah digunakan" });
       }
 
       // Hash password
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+      console.log("Password hashed successfully");
 
       // Create admin user
       const user = await storage.createUser({
@@ -110,16 +124,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: validatedData.email,
         firstName: validatedData.firstName,
         lastName: validatedData.lastName,
-        phone: validatedData.phone,
+        phone: validatedData.phone || undefined,
         password: hashedPassword,
         role: 'admin', // Set role to admin
       });
 
+      console.log("Admin user created successfully:", user.id);
+
       // Log user in
       req.login(user, (err) => {
         if (err) {
+          console.error("Failed to login after admin registration:", err);
           return res.status(500).json({ message: "Failed to login after registration" });
         }
+        console.log("Admin logged in successfully");
         res.json({ message: "Admin registration successful", user: { ...user, password: undefined } });
       });
     } catch (error: any) {
