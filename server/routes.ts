@@ -80,6 +80,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin registration route (special endpoint with secret key)
+  app.post('/api/register-admin', async (req, res) => {
+    try {
+      const { adminSecretKey, ...userData } = req.body;
+      
+      // Check for admin secret key (you can set this in environment variables)
+      // For now, we'll allow if the key is "admin123" or if ADMIN_SECRET_KEY env var matches
+      const validSecretKey = process.env.ADMIN_SECRET_KEY || "admin123";
+      
+      if (adminSecretKey !== validSecretKey) {
+        return res.status(403).json({ message: "Invalid admin secret key" });
+      }
+      
+      const validatedData = registerSchema.parse(userData);
+      
+      // Check if username or email already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username sudah digunakan" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+
+      // Create admin user
+      const user = await storage.createUser({
+        username: validatedData.username,
+        email: validatedData.email,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        phone: validatedData.phone,
+        password: hashedPassword,
+        role: 'admin', // Set role to admin
+      });
+
+      // Log user in
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Failed to login after registration" });
+        }
+        res.json({ message: "Admin registration successful", user: { ...user, password: undefined } });
+      });
+    } catch (error: any) {
+      console.error("Error during admin registration:", error);
+      res.status(400).json({ message: error.message || "Admin registration failed" });
+    }
+  });
+
   // Login route
   app.post('/api/login', (req, res, next) => {
     passport.authenticate('local', (err: any, user: any, info: any) => {

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import RegisterAdmin from "@/pages/register-admin";
 import MemberDashboard from "@/pages/member-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import Checkout from "@/pages/checkout";
@@ -28,6 +29,7 @@ function Router() {
         <>
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
+          <Route path="/register-admin" component={RegisterAdmin} />
           <Route path="/">
             <Redirect to="/login" />
           </Route>
