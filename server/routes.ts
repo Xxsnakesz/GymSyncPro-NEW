@@ -2,9 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import * as midtransClient from 'midtrans-client';
+import passport from "passport";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertMembershipPlanSchema, insertGymClassSchema, insertClassBookingSchema, insertCheckInSchema, insertPaymentSchema } from "@shared/schema";
+import { setupAuth, isAuthenticated, isAdmin } from "./auth";
+import { insertMembershipPlanSchema, insertGymClassSchema, insertClassBookingSchema, insertCheckInSchema, insertPaymentSchema, registerSchema, loginSchema } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
@@ -40,12 +42,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Register route
+  app.post('/api/register', async (req, res) => {
+    try {
+      const validatedData = registerSchema.parse(req.body);
+      
+      // Check if username or email already exists
+      const existingUser = await storage.getUserByUsername(validatedData.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username sudah digunakan" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(validatedData.password, 10);
+
+      // Create user
+      const user = await storage.createUser({
+        username: validatedData.username,
+        email: validatedData.email,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        phone: validatedData.phone,
+        password: hashedPassword,
+        role: 'member',
+      });
+
+      // Log user in
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Failed to login after registration" });
+        }
+        res.json({ message: "Registration successful", user: { ...user, password: undefined } });
+      });
+    } catch (error: any) {
+      console.error("Error during registration:", error);
+      res.status(400).json({ message: error.message || "Registration failed" });
+    }
+  });
+
+  // Login route
+  app.post('/api/login', (req, res, next) => {
+    passport.authenticate('local', (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Login error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Login failed" });
+      }
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login error" });
+        }
+        res.json({ message: "Login successful", user: { ...user, password: undefined } });
+      });
+    })(req, res, next);
+  });
+
+  // Logout route
+  app.post('/api/logout', (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ message: "Logout successful" });
+    });
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      res.json({ ...req.user, password: undefined });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -55,7 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Member routes
   app.get('/api/member/dashboard', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       const [membership, checkIns, classBookings, payments, crowdCount] = await Promise.all([
         storage.getUserMembership(userId),
@@ -94,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check-in routes
   app.post('/api/checkin/generate', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const qrCode = randomUUID();
       
       const checkIn = await storage.createCheckIn({
@@ -134,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/classes/:classId/book', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { classId } = req.params;
       const { bookingDate } = req.body;
 
@@ -171,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       const { planId } = req.body;
 
@@ -246,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin routes
   app.get('/api/admin/dashboard', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (user?.role !== 'admin') {
@@ -281,7 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/members', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (user?.role !== 'admin') {
@@ -298,7 +364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/membership-plans', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (user?.role !== 'admin') {
@@ -316,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/classes', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (user?.role !== 'admin') {
@@ -335,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin Check-in routes
   app.post('/api/admin/checkin/validate', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (user?.role !== 'admin') {
@@ -362,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/checkins', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (user?.role !== 'admin') {
@@ -397,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = qrisPaymentSchema.parse(req.body);
       const { planId } = validatedData;
 
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
 
       if (!user?.email) {
@@ -487,7 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = vaPaymentSchema.parse(req.body);
       const { planId, bankCode } = validatedData;
 
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
 
       if (!user?.email) {
@@ -592,7 +658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/payment/status/:orderId', isAuthenticated, async (req: any, res) => {
     try {
       const { orderId } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       // Verify the order belongs to this user by checking the order format
       // Format: gym-${userId}-${timestamp} or gym-va-${userId}-${timestamp}
@@ -743,7 +809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notification check for expiring memberships
   app.get('/api/notifications/expiring', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       const expiring = await storage.getExpiringMemberships(20);

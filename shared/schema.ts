@@ -180,17 +180,17 @@ export const insertUserSchema = createInsertSchema(users).omit({
 });
 
 // Register schema with validation
-export const registerSchema = insertUserSchema.extend({
+export const registerSchema = insertUserSchema.omit({
+  role: true,
+  stripeCustomerId: true,
+  stripeSubscriptionId: true,
+  profileImageUrl: true,
+}).extend({
   password: z.string().min(6, "Password minimal 6 karakter"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Password tidak cocok",
   path: ["confirmPassword"],
-}).omit({
-  role: true,
-  stripeCustomerId: true,
-  stripeSubscriptionId: true,
-  profileImageUrl: true,
 });
 
 // Login schema
