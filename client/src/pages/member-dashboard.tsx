@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import QRModal from "@/components/qr-modal";
 import PaymentModal from "@/components/payment-modal";
+import FeedbackModal from "@/components/feedback-modal";
 import Navigation from "@/components/ui/navigation";
 import {
   CalendarCheck,
@@ -23,6 +24,7 @@ import {
   Bell,
   Clock,
   TriangleAlert,
+  MessageSquarePlus,
 } from "lucide-react";
 
 export default function MemberDashboard() {
@@ -30,6 +32,7 @@ export default function MemberDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [showQRModal, setShowQRModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -181,16 +184,28 @@ export default function MemberDashboard() {
               </h2>
               <p className="text-sm sm:text-base text-muted-foreground mt-1">Here's your fitness journey overview</p>
             </div>
-            <Button
-              onClick={() => generateQRMutation.mutate()}
-              disabled={generateQRMutation.isPending}
-              className="success-gradient text-white w-full sm:w-auto shadow-lg"
-              size="lg"
-              data-testid="button-generate-qr"
-            >
-              <QrCode size={20} className="mr-2" />
-              {generateQRMutation.isPending ? "Generating..." : "Generate Check-in QR"}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={() => generateQRMutation.mutate()}
+                disabled={generateQRMutation.isPending}
+                className="success-gradient text-white w-full sm:w-auto shadow-lg"
+                size="lg"
+                data-testid="button-generate-qr"
+              >
+                <QrCode size={20} className="mr-2" />
+                {generateQRMutation.isPending ? "Generating..." : "Generate Check-in QR"}
+              </Button>
+              <Button
+                onClick={() => setShowFeedbackModal(true)}
+                variant="outline"
+                className="w-full sm:w-auto"
+                size="lg"
+                data-testid="button-feedback"
+              >
+                <MessageSquarePlus size={20} className="mr-2" />
+                Send Feedback
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -590,6 +605,11 @@ export default function MemberDashboard() {
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
+      />
+
+      <FeedbackModal
+        open={showFeedbackModal}
+        onOpenChange={setShowFeedbackModal}
       />
     </div>
   );
