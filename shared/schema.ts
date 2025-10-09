@@ -115,12 +115,26 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Feedback
+export const feedbacks = pgTable("feedbacks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  subject: varchar("subject").notNull(),
+  message: text("message").notNull(),
+  rating: integer("rating"), // 1-5 stars
+  status: varchar("status").default("pending"), // pending, reviewed, resolved
+  adminResponse: text("admin_response"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(memberships),
   classBookings: many(classBookings),
   checkIns: many(checkIns),
   payments: many(payments),
+  feedbacks: many(feedbacks),
 }));
 
 export const membershipPlansRelations = relations(membershipPlans, ({ many }) => ({
@@ -169,6 +183,13 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   membership: one(memberships, {
     fields: [payments.membershipId],
     references: [memberships.id],
+  }),
+}));
+
+export const feedbacksRelations = relations(feedbacks, ({ one }) => ({
+  user: one(users, {
+    fields: [feedbacks.userId],
+    references: [users.id],
   }),
 }));
 
@@ -229,6 +250,12 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   createdAt: true,
 });
 
+export const insertFeedbackSchema = createInsertSchema(feedbacks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -246,3 +273,5 @@ export type CheckIn = typeof checkIns.$inferSelect;
 export type InsertCheckIn = z.infer<typeof insertCheckInSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Feedback = typeof feedbacks.$inferSelect;
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
