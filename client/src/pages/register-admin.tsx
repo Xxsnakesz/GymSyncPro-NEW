@@ -1,7 +1,5 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema } from "@shared/schema";
-import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -11,12 +9,23 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { ShieldCheck } from "lucide-react";
+import { z } from "zod";
 
-type RegisterFormData = z.infer<typeof registerSchema> & { adminSecretKey: string };
-
-const registerAdminSchema = registerSchema.extend({
+const registerAdminSchema = z.object({
   adminSecretKey: z.string().min(1, "Admin secret key is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Invalid email address"),
+  phone: z.string().optional(),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(6, "Confirm password is required"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
+
+type RegisterFormData = z.infer<typeof registerAdminSchema>;
 
 export default function RegisterAdmin() {
   const { toast } = useToast();
