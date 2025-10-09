@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dumbbell, Bell, ShieldQuestion, LogOut } from "lucide-react";
 import logoPath from "@assets/image_1759411904981.png";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface NavigationProps {
   user: any;
@@ -11,8 +12,16 @@ interface NavigationProps {
 }
 
 export default function Navigation({ user, isAdmin = false, notificationCount = 0 }: NavigationProps) {
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/logout");
+      queryClient.clear();
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Logout error:", error);
+      queryClient.clear();
+      window.location.href = "/login";
+    }
   };
 
   return (
