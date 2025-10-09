@@ -58,6 +58,7 @@ export interface IStorage {
   getCurrentCrowdCount(): Promise<number>;
   validateCheckInQR(qrCode: string): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined>;
   getRecentCheckIns(limit?: number): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } })[]>;
+  autoCheckoutExpiredSessions(): Promise<number>;
   
   // Payment operations
   getUserPayments(userId: string): Promise<Payment[]>;
@@ -415,6 +416,38 @@ export class DatabaseStorage implements IStorage {
         }
       } : undefined
     }));
+  }
+
+  async autoCheckoutExpiredSessions(): Promise<number> {
+    const threeHoursAgo = new Date();
+    threeHoursAgo.setHours(threeHoursAgo.getHours() - 3);
+
+    const expiredCheckIns = await db
+      .select()
+      .from(checkIns)
+      .where(
+        and(
+          eq(checkIns.status, "active"),
+          lte(checkIns.checkInTime, threeHoursAgo)
+        )
+      );
+
+    if (expiredCheckIns.length === 0) {
+      return 0;
+    }
+
+    for (const checkIn of expiredCheckIns) {
+      await db
+        .update(checkIns)
+        .set({ 
+          checkOutTime: new Date(), 
+          status: "completed" 
+        })
+        .where(eq(checkIns.id, checkIn.id));
+    }
+
+    console.log(`Auto-checkout: ${expiredCheckIns.length} member(s) checked out automatically after 3 hours`);
+    return expiredCheckIns.length;
   }
 
   // Payment operations

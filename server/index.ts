@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -69,5 +70,18 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    setInterval(async () => {
+      try {
+        const checkedOutCount = await storage.autoCheckoutExpiredSessions();
+        if (checkedOutCount > 0) {
+          log(`Auto-checkout job: ${checkedOutCount} member(s) automatically checked out`);
+        }
+      } catch (error) {
+        console.error("Error in auto-checkout job:", error);
+      }
+    }, 60000);
+    
+    log("Auto-checkout job started - runs every 1 minute");
   });
 })();

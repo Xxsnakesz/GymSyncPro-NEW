@@ -510,6 +510,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/admin/auto-checkout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const checkedOutCount = await storage.autoCheckoutExpiredSessions();
+      res.json({ 
+        success: true, 
+        checkedOutCount,
+        message: `Successfully auto-checked out ${checkedOutCount} member(s)`
+      });
+    } catch (error) {
+      console.error("Error running auto-checkout:", error);
+      res.status(500).json({ message: "Failed to run auto-checkout" });
+    }
+  });
+
   // Feedback routes
   app.post('/api/feedbacks', isAuthenticated, async (req: any, res) => {
     try {
