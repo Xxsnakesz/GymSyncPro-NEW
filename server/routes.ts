@@ -556,6 +556,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/admin/members/:id/suspend', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      await storage.updateUser(id, { active: false });
+      res.json({ message: 'Member suspended successfully' });
+    } catch (error) {
+      console.error("Error suspending member:", error);
+      res.status(500).json({ message: "Failed to suspend member" });
+    }
+  });
+
+  app.put('/api/admin/members/:id/activate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      await storage.updateUser(id, { active: true });
+      res.json({ message: 'Member activated successfully' });
+    } catch (error) {
+      console.error("Error activating member:", error);
+      res.status(500).json({ message: "Failed to activate member" });
+    }
+  });
+
   app.post('/api/admin/members/:id/membership', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
