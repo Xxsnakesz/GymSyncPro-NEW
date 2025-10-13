@@ -243,7 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const membership = await storage.getUserMembership(userId);
       
       // Check if membership is active
-      const hasActiveMembership = membership && new Date(membership.endDate) > new Date();
+      const hasActiveMembership = !!(membership && new Date(membership.endDate) > new Date());
 
       res.json({ 
         qrCode, 

@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { QrCode, RefreshCw } from "lucide-react";
+import { QrCode, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import QRCode from "qrcode";
 
 interface QRModalProps {
@@ -92,6 +92,47 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
         </DialogHeader>
         
         <div className="flex flex-col items-center space-y-6 p-6">
+          {/* Membership Status Badge */}
+          {currentQRData?.hasActiveMembership !== undefined && (
+            <div className={`w-full flex items-center justify-center gap-3 p-4 rounded-lg border-2 ${
+              currentQRData.hasActiveMembership 
+                ? 'bg-green-50 dark:bg-green-950/20 border-green-500' 
+                : 'bg-red-50 dark:bg-red-950/20 border-red-500'
+            }`} data-testid="membership-status-banner">
+              {currentQRData.hasActiveMembership ? (
+                <>
+                  <div className="bg-green-500 rounded-full p-2">
+                    <CheckCircle2 className="w-6 h-6 text-white" data-testid="icon-membership-active" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-green-600 dark:text-green-400" data-testid="text-membership-active">
+                      Membership Active
+                    </h3>
+                    {currentQRData.membership && (
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        {currentQRData.membership.plan?.name}
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-red-500 rounded-full p-2">
+                    <XCircle className="w-6 h-6 text-white" data-testid="icon-no-membership" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-red-600 dark:text-red-400" data-testid="text-no-membership">
+                      Belum Terdaftar Membership
+                    </h3>
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      Silakan daftar membership terlebih dahulu
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          
           {/* QR Code Display */}
           <div className="bg-white p-6 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
             <div className="text-center">
