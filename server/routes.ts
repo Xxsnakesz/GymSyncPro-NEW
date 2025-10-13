@@ -463,6 +463,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/admin/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { password, ...memberData } = req.body;
+      
+      const existingUsername = await storage.getUserByUsername(memberData.username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username sudah digunakan" });
+      }
+
+      const existingEmail = await storage.getUserByEmail(memberData.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email sudah digunakan" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password || 'default123', 10);
+
+      const newMember = await storage.createUser({
+        ...memberData,
+        password: hashedPassword,
+        role: 'member',
+      });
+
+      res.json({ ...newMember, password: undefined });
+    } catch (error: any) {
+      console.error("Error creating member:", error);
+      res.status(500).json({ message: error.message || "Failed to create member" });
+    }
+  });
+
+  app.put('/api/admin/members/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      const { password, ...updateData } = req.body;
+
+      if (updateData.username) {
+        const existingUsername = await storage.getUserByUsername(updateData.username);
+        if (existingUsername && existingUsername.id !== id) {
+          return res.status(400).json({ message: "Username sudah digunakan" });
+        }
+      }
+
+      if (updateData.email) {
+        const existingEmail = await storage.getUserByEmail(updateData.email);
+        if (existingEmail && existingEmail.id !== id) {
+          return res.status(400).json({ message: "Email sudah digunakan" });
+        }
+      }
+
+      const dataToUpdate: any = { ...updateData };
+      if (password) {
+        dataToUpdate.password = await bcrypt.hash(password, 10);
+      }
+
+      const updatedMember = await storage.updateUser(id, dataToUpdate);
+      res.json({ ...updatedMember, password: undefined });
+    } catch (error: any) {
+      console.error("Error updating member:", error);
+      res.status(500).json({ message: error.message || "Failed to update member" });
+    }
+  });
+
+  app.delete('/api/admin/members/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      await storage.deleteUser(id);
+      res.json({ message: 'Member deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting member:", error);
+      res.status(500).json({ message: "Failed to delete member" });
+    }
+  });
+
+  app.post('/api/admin/members/:id/membership', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id: memberId } = req.params;
+      const { planId, durationMonths } = req.body;
+
+      const plan = await storage.getMembershipPlans();
+      const selectedPlan = plan.find(p => p.id === planId);
+      
+      if (!selectedPlan) {
+        return res.status(404).json({ message: 'Plan not found' });
+      }
+
+      const existingMembership = await storage.getUserMembership(memberId);
+      if (existingMembership) {
+        await storage.cancelUserMemberships(memberId);
+      }
+
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + (durationMonths || selectedPlan.durationMonths));
+
+      const membership = await storage.createMembership({
+        userId: memberId,
+        planId,
+        startDate,
+        endDate,
+        status: 'active',
+        autoRenewal: false,
+      });
+
+      res.json(membership);
+    } catch (error: any) {
+      console.error("Error assigning membership:", error);
+      res.status(500).json({ message: error.message || "Failed to assign membership" });
+    }
+  });
+
   app.post('/api/admin/membership-plans', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;

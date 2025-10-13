@@ -40,6 +40,8 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<UpsertUser>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User>;
   
   // Membership operations
@@ -47,7 +49,9 @@ export interface IStorage {
   createMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
   getUserMembership(userId: string): Promise<(Membership & { plan: MembershipPlan }) | undefined>;
   createMembership(membership: InsertMembership): Promise<Membership>;
+  updateMembership(id: string, membership: Partial<InsertMembership>): Promise<void>;
   updateMembershipStatus(id: string, status: string): Promise<void>;
+  cancelUserMemberships(userId: string): Promise<void>;
   getExpiringMemberships(days: number): Promise<(Membership & { user: User; plan: MembershipPlan })[]>;
   
   // Class operations
@@ -142,6 +146,22 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: string, userData: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...userData,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+
   async updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User> {
     const [user] = await db
       .update(users)
@@ -191,8 +211,18 @@ export class DatabaseStorage implements IStorage {
     return newMembership;
   }
 
+  async updateMembership(id: string, membershipData: Partial<InsertMembership>): Promise<void> {
+    await db.update(memberships).set(membershipData).where(eq(memberships.id, id));
+  }
+
   async updateMembershipStatus(id: string, status: string): Promise<void> {
     await db.update(memberships).set({ status }).where(eq(memberships.id, id));
+  }
+
+  async cancelUserMemberships(userId: string): Promise<void> {
+    await db.update(memberships)
+      .set({ status: 'cancelled' })
+      .where(eq(memberships.userId, userId));
   }
 
   async getExpiringMemberships(days: number): Promise<(Membership & { user: User; plan: MembershipPlan })[]> {
