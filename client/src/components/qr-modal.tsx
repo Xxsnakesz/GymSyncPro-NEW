@@ -23,6 +23,7 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
   const { toast } = useToast();
   const [currentQRData, setCurrentQRData] = useState(qrData);
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string>("");
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const generateNewQRMutation = useMutation({
@@ -86,6 +87,45 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
       setCurrentQRData(qrData);
     }
   }, [qrData, currentQRData]);
+
+  // Countdown timer for QR expiry
+  useEffect(() => {
+    if (!currentQRData?.expiresAt) return;
+
+    const calculateTimeRemaining = () => {
+      const now = new Date().getTime();
+      const expires = new Date(currentQRData.expiresAt).getTime();
+      const remaining = Math.max(0, Math.floor((expires - now) / 1000));
+      return remaining;
+    };
+
+    // Initial calculation
+    setTimeRemaining(calculateTimeRemaining());
+
+    // Track if refresh is already in progress
+    let refreshInProgress = false;
+
+    // Update every second
+    const interval = setInterval(() => {
+      const remaining = calculateTimeRemaining();
+      setTimeRemaining(remaining);
+
+      // Auto-refresh QR 30 seconds before expiry (or when expired)
+      // Only trigger once and avoid flood of requests
+      if (remaining <= 30 && !refreshInProgress && !generateNewQRMutation.isPending) {
+        refreshInProgress = true;
+        generateNewQRMutation.mutate();
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [currentQRData?.expiresAt, generateNewQRMutation]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -164,9 +204,27 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
               )}
             </div>
           </div>
+
+          {/* Countdown Timer */}
+          {timeRemaining > 0 && (
+            <div className={`w-full p-3 rounded-lg border-2 ${
+              timeRemaining <= 60 ? 'bg-red-50 dark:bg-red-950/20 border-red-500' : 'bg-blue-50 dark:bg-blue-950/20 border-blue-500'
+            }`} data-testid="countdown-timer">
+              <div className="flex items-center justify-center gap-2">
+                <span className={`font-bold ${
+                  timeRemaining <= 60 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'
+                }`} data-testid="text-time-remaining">
+                  {formatTime(timeRemaining)}
+                </span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {timeRemaining <= 60 ? 'QR akan expired!' : 'berlaku'}
+                </span>
+              </div>
+            </div>
+          )}
           
           <p className="text-sm text-muted-foreground text-center">
-            Scan QR code ini untuk check-in otomatis
+            Scan QR code ini untuk check-in otomatis. QR sekali pakai berlaku 5 menit.
           </p>
           
           <div className="flex gap-3 w-full">

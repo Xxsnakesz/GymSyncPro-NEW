@@ -9,6 +9,7 @@ import {
   feedbacks,
   personalTrainers,
   ptBookings,
+  oneTimeQrCodes,
   type User,
   type UpsertUser,
   type Membership,
@@ -29,6 +30,8 @@ import {
   type InsertPersonalTrainer,
   type PtBooking,
   type InsertPtBooking,
+  type OneTimeQrCode,
+  type InsertOneTimeQrCode,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, lte, and, count, sum } from "drizzle-orm";
@@ -78,6 +81,12 @@ export interface IStorage {
   validateMemberQrAndCheckIn(qrCode: string): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined>;
   getRecentCheckIns(limit?: number): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } })[]>;
   autoCheckoutExpiredSessions(): Promise<number>;
+  
+  // One-time QR code operations
+  generateOneTimeQrCode(userId: string): Promise<OneTimeQrCode>;
+  validateOneTimeQrCode(qrCode: string): Promise<(OneTimeQrCode & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined>;
+  markQrCodeAsUsed(qrCode: string): Promise<void>;
+  cleanupExpiredQrCodes(): Promise<number>;
   
   // Payment operations
   getUserPayments(userId: string): Promise<Payment[]>;
@@ -1052,6 +1061,134 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(ptBookings.id, id));
+  }
+
+  // One-time QR code operations
+  async generateOneTimeQrCode(userId: string): Promise<OneTimeQrCode> {
+    const { randomUUID } = await import('crypto');
+    const qrCode = randomUUID();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes from now
+
+    const [newQrCode] = await db
+      .insert(oneTimeQrCodes)
+      .values({
+        userId,
+        qrCode,
+        expiresAt,
+        status: 'valid',
+      })
+      .returning();
+    
+    return newQrCode;
+  }
+
+  async validateOneTimeQrCode(qrCode: string): Promise<(OneTimeQrCode & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined> {
+    const result = await db
+      .select({
+        id: oneTimeQrCodes.id,
+        userId: oneTimeQrCodes.userId,
+        qrCode: oneTimeQrCodes.qrCode,
+        expiresAt: oneTimeQrCodes.expiresAt,
+        usedAt: oneTimeQrCodes.usedAt,
+        status: oneTimeQrCodes.status,
+        createdAt: oneTimeQrCodes.createdAt,
+        user: users,
+        membershipId: memberships.id,
+        membershipUserId: memberships.userId,
+        membershipPlanId: memberships.planId,
+        membershipStartDate: memberships.startDate,
+        membershipEndDate: memberships.endDate,
+        membershipStatus: memberships.status,
+        membershipAutoRenewal: memberships.autoRenewal,
+        membershipCreatedAt: memberships.createdAt,
+        planId: membershipPlans.id,
+        planName: membershipPlans.name,
+        planDescription: membershipPlans.description,
+        planPrice: membershipPlans.price,
+        planDurationMonths: membershipPlans.durationMonths,
+        planFeatures: membershipPlans.features,
+        planStripePriceId: membershipPlans.stripePriceId,
+        planActive: membershipPlans.active,
+        planCreatedAt: membershipPlans.createdAt,
+      })
+      .from(oneTimeQrCodes)
+      .innerJoin(users, eq(oneTimeQrCodes.userId, users.id))
+      .leftJoin(memberships, and(eq(users.id, memberships.userId), eq(memberships.status, "active")))
+      .leftJoin(membershipPlans, eq(memberships.planId, membershipPlans.id))
+      .where(eq(oneTimeQrCodes.qrCode, qrCode))
+      .limit(1);
+
+    if (result.length === 0) return undefined;
+
+    const row = result[0];
+    return {
+      id: row.id,
+      userId: row.userId,
+      qrCode: row.qrCode,
+      expiresAt: row.expiresAt,
+      usedAt: row.usedAt,
+      status: row.status,
+      createdAt: row.createdAt,
+      user: row.user,
+      membership: row.membershipId ? {
+        id: row.membershipId,
+        userId: row.membershipUserId!,
+        planId: row.membershipPlanId!,
+        startDate: row.membershipStartDate!,
+        endDate: row.membershipEndDate!,
+        status: row.membershipStatus!,
+        autoRenewal: row.membershipAutoRenewal!,
+        createdAt: row.membershipCreatedAt!,
+        plan: {
+          id: row.planId!,
+          name: row.planName!,
+          description: row.planDescription,
+          price: row.planPrice!,
+          durationMonths: row.planDurationMonths!,
+          features: row.planFeatures,
+          stripePriceId: row.planStripePriceId,
+          active: row.planActive!,
+          createdAt: row.planCreatedAt!,
+        }
+      } : undefined
+    };
+  }
+
+  async markQrCodeAsUsed(qrCode: string): Promise<void> {
+    // Atomic update: only mark as used if status is still 'valid'
+    // This prevents race conditions where two concurrent requests try to use the same QR
+    const result = await db
+      .update(oneTimeQrCodes)
+      .set({
+        status: 'used',
+        usedAt: new Date(),
+      })
+      .where(and(
+        eq(oneTimeQrCodes.qrCode, qrCode),
+        eq(oneTimeQrCodes.status, 'valid')
+      ))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error('QR code already used or invalid');
+    }
+  }
+
+  async cleanupExpiredQrCodes(): Promise<number> {
+    const now = new Date();
+    
+    // Mark expired QR codes
+    const result = await db
+      .update(oneTimeQrCodes)
+      .set({ status: 'expired' })
+      .where(and(
+        eq(oneTimeQrCodes.status, 'valid'),
+        lte(oneTimeQrCodes.expiresAt, now)
+      ))
+      .returning();
+    
+    return result.length;
   }
 }
 

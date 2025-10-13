@@ -236,8 +236,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Get or generate permanent QR code for user
-      const qrCode = await storage.ensureUserPermanentQrCode(userId);
+      // Generate one-time QR code with 5 minutes expiry
+      const oneTimeQr = await storage.generateOneTimeQrCode(userId);
       
       // Get membership info
       const membership = await storage.getUserMembership(userId);
@@ -246,7 +246,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasActiveMembership = !!(membership && new Date(membership.endDate) > new Date());
 
       res.json({ 
-        qrCode, 
+        qrCode: oneTimeQr.qrCode,
+        expiresAt: oneTimeQr.expiresAt,
         membership,
         hasActiveMembership 
       });
@@ -267,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Public check-in verification endpoint (no auth required)
+  // Public check-in verification endpoint (no auth required) - One-time QR
   app.post('/api/checkin/verify', async (req, res) => {
     try {
       const { qrCode } = req.body;
@@ -279,15 +280,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Find user by QR code
-      const memberUser = await storage.getUserByPermanentQrCode(qrCode);
+      // Validate one-time QR code
+      const qrData = await storage.validateOneTimeQrCode(qrCode);
       
-      if (!memberUser) {
+      if (!qrData) {
         return res.status(404).json({ 
           success: false,
-          message: 'QR code tidak valid atau member tidak ditemukan' 
+          message: 'QR code tidak valid atau tidak ditemukan' 
         });
       }
+
+      // Check if QR code is already used
+      if (qrData.status === 'used') {
+        return res.json({
+          success: false,
+          message: 'QR code sudah pernah digunakan'
+        });
+      }
+
+      // Check if QR code is expired
+      const now = new Date();
+      if (qrData.status === 'expired' || qrData.expiresAt < now) {
+        return res.json({
+          success: false,
+          message: 'QR code sudah kadaluarsa. Silakan generate QR baru'
+        });
+      }
+
+      const memberUser = qrData.user;
 
       // Sanitize user data - only return safe fields for display
       const safeUserData = {
@@ -305,9 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check membership status
-      const membership = await storage.getUserMembership(memberUser.id);
-      const now = new Date();
-      const hasActiveMembership = membership && new Date(membership.endDate) > now;
+      const hasActiveMembership = qrData.membership && new Date(qrData.membership.endDate) > now;
 
       // If no active membership, return failure response with member info
       if (!hasActiveMembership) {
@@ -318,23 +336,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Membership is active, create check-in
-      const checkInData = await storage.validateMemberQrAndCheckIn(qrCode);
-      
-      if (!checkInData) {
-        return res.status(500).json({ 
+      // Mark QR code as used (atomic operation to prevent race conditions)
+      try {
+        await storage.markQrCodeAsUsed(qrCode);
+      } catch (error) {
+        // QR already used by another concurrent request
+        return res.json({
           success: false,
-          message: 'Gagal membuat check-in' 
+          message: 'QR code sudah pernah digunakan'
         });
       }
+
+      // Create check-in
+      const { randomUUID } = await import('crypto');
+      const checkInQr = randomUUID();
+      const checkIn = await storage.createCheckIn({
+        userId: memberUser.id,
+        qrCode: checkInQr,
+        status: 'active',
+      });
 
       // Sanitize check-in data before returning
       res.json({
         success: true,
         user: safeUserData,
         checkIn: {
-          id: checkInData.id,
-          checkInTime: checkInData.checkInTime
+          id: checkIn.id,
+          checkInTime: checkIn.checkInTime
         }
       });
     } catch (error) {
