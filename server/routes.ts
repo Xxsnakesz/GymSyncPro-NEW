@@ -464,6 +464,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/classes', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const classes = await storage.getGymClasses();
+      res.json(classes);
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+      res.status(500).json({ message: "Failed to fetch classes" });
+    }
+  });
+
+  app.put('/api/admin/classes/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      const updateData = req.body;
+      
+      await storage.updateGymClass(id, updateData);
+      res.json({ message: 'Class updated successfully' });
+    } catch (error) {
+      console.error("Error updating class:", error);
+      res.status(500).json({ message: "Failed to update class" });
+    }
+  });
+
+  app.delete('/api/admin/classes/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      await storage.deleteGymClass(id);
+      res.json({ message: 'Class deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      res.status(500).json({ message: "Failed to delete class" });
+    }
+  });
+
   // Admin Check-in routes
   app.post('/api/admin/checkin/validate', isAuthenticated, async (req: any, res) => {
     try {

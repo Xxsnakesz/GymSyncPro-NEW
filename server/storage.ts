@@ -53,6 +53,8 @@ export interface IStorage {
   // Class operations
   getGymClasses(): Promise<GymClass[]>;
   createGymClass(gymClass: InsertGymClass): Promise<GymClass>;
+  updateGymClass(id: string, gymClass: Partial<InsertGymClass>): Promise<void>;
+  deleteGymClass(id: string): Promise<void>;
   getUserClassBookings(userId: string): Promise<(ClassBooking & { gymClass: GymClass })[]>;
   bookClass(booking: InsertClassBooking): Promise<ClassBooking>;
   cancelClassBooking(id: string): Promise<void>;
@@ -228,6 +230,14 @@ export class DatabaseStorage implements IStorage {
   async createGymClass(gymClass: InsertGymClass): Promise<GymClass> {
     const [newClass] = await db.insert(gymClasses).values(gymClass).returning();
     return newClass;
+  }
+
+  async updateGymClass(id: string, gymClass: Partial<InsertGymClass>): Promise<void> {
+    await db.update(gymClasses).set(gymClass).where(eq(gymClasses.id, id));
+  }
+
+  async deleteGymClass(id: string): Promise<void> {
+    await db.update(gymClasses).set({ active: false }).where(eq(gymClasses.id, id));
   }
 
   async getUserClassBookings(userId: string): Promise<(ClassBooking & { gymClass: GymClass })[]> {

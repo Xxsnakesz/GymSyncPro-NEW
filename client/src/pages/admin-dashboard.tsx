@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Navigation from "@/components/ui/navigation";
 import AdminCheckInModal from "@/components/admin-checkin-modal";
 import AdminPTDialog from "@/components/admin-pt-dialog";
+import AdminClassDialog from "@/components/admin-class-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import type { PersonalTrainer } from "@shared/schema";
+import type { PersonalTrainer, GymClass } from "@shared/schema";
 import {
   Users,
   CalendarCheck,
@@ -104,6 +105,8 @@ export default function AdminDashboard() {
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [showPTDialog, setShowPTDialog] = useState(false);
   const [selectedTrainer, setSelectedTrainer] = useState<PersonalTrainer | null>(null);
+  const [showClassDialog, setShowClassDialog] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<GymClass | null>(null);
 
   // Redirect if not authenticated or not admin
   useEffect(() => {
@@ -147,6 +150,12 @@ export default function AdminDashboard() {
 
   const { data: trainers } = useQuery<PersonalTrainer[]>({
     queryKey: ["/api/admin/trainers"],
+    enabled: isAuthenticated && user?.role === 'admin',
+    retry: false,
+  });
+
+  const { data: gymClasses } = useQuery<GymClass[]>({
+    queryKey: ["/api/admin/classes"],
     enabled: isAuthenticated && user?.role === 'admin',
     retry: false,
   });
@@ -233,6 +242,38 @@ export default function AdminDashboard() {
       toast({
         title: "Error",
         description: error.message || "Gagal menghapus personal trainer",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddClass = () => {
+    setSelectedClass(null);
+    setShowClassDialog(true);
+  };
+
+  const handleEditClass = (gymClass: GymClass) => {
+    setSelectedClass(gymClass);
+    setShowClassDialog(true);
+  };
+
+  const handleDeleteClass = async (classId: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus class ini?")) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/admin/classes/${classId}`, "DELETE");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/classes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/classes"] });
+      toast({
+        title: "Berhasil!",
+        description: "Gym class berhasil dihapus",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal menghapus gym class",
         variant: "destructive",
       });
     }
@@ -726,6 +767,103 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {/* Gym Classes Management Section */}
+        <div className="mt-8">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="text-primary" size={20} />
+                    Gym Classes
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">Kelola kelas gym dan jadwal</p>
+                </div>
+                <Button 
+                  onClick={handleAddClass}
+                  className="gym-gradient text-white"
+                  data-testid="button-add-class"
+                >
+                  <UserPlus className="mr-2" size={16} />
+                  Tambah Class
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {!gymClasses || gymClasses.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="mx-auto mb-3" size={48} />
+                  <p className="text-lg font-medium">Belum Ada Gym Class</p>
+                  <p className="text-sm mt-1">Tambahkan gym class pertama Anda</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {gymClasses.map((gymClass: GymClass) => (
+                    <div 
+                      key={gymClass.id} 
+                      className="border border-border rounded-lg p-4 hover:shadow-md transition-shadow"
+                      data-testid={`card-class-${gymClass.id}`}
+                    >
+                      <div className="mb-3">
+                        <h4 className="font-semibold text-foreground text-lg">{gymClass.name}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Instruktur: {gymClass.instructorName}
+                        </p>
+                      </div>
+                      
+                      {gymClass.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {gymClass.description}
+                        </p>
+                      )}
+                      
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock size={14} className="text-muted-foreground" />
+                          <span className="text-muted-foreground">{gymClass.schedule}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Users size={14} className="text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            {gymClass.currentEnrollment}/{gymClass.maxCapacity} peserta
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-border">
+                        <Badge 
+                          variant={gymClass.active ? "default" : "secondary"}
+                        >
+                          {gymClass.active ? "Aktif" : "Tidak Aktif"}
+                        </Badge>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditClass(gymClass)}
+                            data-testid={`button-edit-class-${gymClass.id}`}
+                          >
+                            <Edit size={16} />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClass(gymClass.id)}
+                            data-testid={`button-delete-class-${gymClass.id}`}
+                          >
+                            <Trash2 size={16} className="text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Member Feedback Section */}
         <div className="mt-8">
           <Card>
@@ -832,6 +970,13 @@ export default function AdminDashboard() {
         open={showPTDialog}
         onOpenChange={setShowPTDialog}
         trainer={selectedTrainer}
+      />
+
+      {/* Gym Class Dialog */}
+      <AdminClassDialog
+        open={showClassDialog}
+        onOpenChange={setShowClassDialog}
+        gymClass={selectedClass}
       />
     </div>
   );
