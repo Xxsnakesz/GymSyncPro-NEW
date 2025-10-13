@@ -38,11 +38,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPermanentQrCode(qrCode: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUser(id: string, user: Partial<UpsertUser>): Promise<User>;
   deleteUser(id: string): Promise<void>;
   updateUserStripeInfo(userId: string, customerId: string, subscriptionId?: string): Promise<User>;
+  ensureUserPermanentQrCode(userId: string): Promise<string>;
   
   // Membership operations
   getMembershipPlans(): Promise<MembershipPlan[]>;
@@ -73,6 +75,7 @@ export interface IStorage {
   updateCheckOut(id: string): Promise<void>;
   getCurrentCrowdCount(): Promise<number>;
   validateCheckInQR(qrCode: string): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined>;
+  validateMemberQrAndCheckIn(qrCode: string): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined>;
   getRecentCheckIns(limit?: number): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } })[]>;
   autoCheckoutExpiredSessions(): Promise<number>;
   
@@ -176,6 +179,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  async getUserByPermanentQrCode(qrCode: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.permanentQrCode, qrCode));
+    return user;
+  }
+
+  async ensureUserPermanentQrCode(userId: string): Promise<string> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    // If user already has a permanent QR code, return it
+    if (user.permanentQrCode) {
+      return user.permanentQrCode;
+    }
+    
+    // Generate a new permanent QR code
+    const { randomUUID } = await import('crypto');
+    const qrCode = randomUUID();
+    
+    // Update user with new permanent QR code
+    await db
+      .update(users)
+      .set({
+        permanentQrCode: qrCode,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    
+    return qrCode;
   }
 
   // Membership operations
@@ -463,6 +498,58 @@ export class DatabaseStorage implements IStorage {
           createdAt: row.planCreatedAt!,
         }
       } : undefined
+    };
+  }
+
+  async validateMemberQrAndCheckIn(qrCode: string): Promise<(CheckIn & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined> {
+    // Find user by permanent QR code
+    const user = await this.getUserByPermanentQrCode(qrCode);
+    if (!user) {
+      return undefined;
+    }
+
+    // Check if user has an active check-in today
+    const existingCheckIn = await db
+      .select({
+        id: checkIns.id,
+        userId: checkIns.userId,
+        checkInTime: checkIns.checkInTime,
+        checkOutTime: checkIns.checkOutTime,
+        qrCode: checkIns.qrCode,
+        status: checkIns.status,
+        createdAt: checkIns.createdAt,
+      })
+      .from(checkIns)
+      .where(and(eq(checkIns.userId, user.id), eq(checkIns.status, "active")))
+      .limit(1);
+
+    let checkIn: CheckIn;
+    
+    if (existingCheckIn.length > 0) {
+      // User already has an active check-in
+      checkIn = existingCheckIn[0];
+    } else {
+      // Create new check-in
+      const { randomUUID } = await import('crypto');
+      const newCheckInQr = randomUUID();
+      const [newCheckIn] = await db
+        .insert(checkIns)
+        .values({
+          userId: user.id,
+          qrCode: newCheckInQr,
+          status: 'active',
+        })
+        .returning();
+      checkIn = newCheckIn;
+    }
+
+    // Get membership info
+    const membership = await this.getUserMembership(user.id);
+
+    return {
+      ...checkIn,
+      user,
+      membership,
     };
   }
 

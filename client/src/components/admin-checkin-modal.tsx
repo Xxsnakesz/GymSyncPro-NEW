@@ -259,68 +259,73 @@ export default function AdminCheckInModal({ open, onClose, onSuccess }: AdminChe
             </div>
           )}
 
-          {/* Member Information */}
+          {/* Success State - Check-in Berhasil */}
           {memberData && (
-            <div className="border border-border rounded-lg p-4 space-y-4 bg-muted/30">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16" data-testid="img-member-avatar">
-                  <AvatarImage src={memberData.user.profileImageUrl} />
-                  <AvatarFallback>
-                    {`${memberData.user.firstName?.[0] || ''}${memberData.user.lastName?.[0] || ''}`}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg" data-testid="text-member-name">
-                    {memberData.user.firstName} {memberData.user.lastName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground" data-testid="text-member-email">
-                    {memberData.user.email}
-                  </p>
+            <div className="space-y-4">
+              {/* Success Header with Large Checkmark */}
+              <div className="flex flex-col items-center justify-center py-6 bg-green-50 dark:bg-green-950/20 rounded-lg border-2 border-green-500">
+                <div className="bg-green-500 rounded-full p-4 mb-4">
+                  <CheckCircle2 className="w-12 h-12 text-white" data-testid="icon-success-checkmark" />
                 </div>
-                <CheckCircle2 className="w-8 h-8 text-green-500" />
+                <h3 className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-success-message">
+                  CHECK-IN BERHASIL
+                </h3>
+                <p className="text-sm text-muted-foreground mt-2" data-testid="text-checkin-time">
+                  {format(new Date(memberData.checkInTime), "HH:mm, dd MMMM yyyy")}
+                </p>
               </div>
 
-              {/* Membership Info */}
-              {memberData.membership ? (
-                <div className="space-y-3 pt-3 border-t border-border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Membership</span>
-                    </div>
-                    <Badge 
-                      variant={getMembershipStatus(memberData.membership.endDate).variant}
-                      data-testid="badge-membership-status"
-                    >
-                      {memberData.membership.plan.name}
-                    </Badge>
+              {/* Member Information */}
+              <div className="border border-border rounded-lg p-4 space-y-4 bg-muted/30">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16" data-testid="img-member-avatar">
+                    <AvatarImage src={memberData.user.profileImageUrl} />
+                    <AvatarFallback>
+                      {`${memberData.user.firstName?.[0] || ''}${memberData.user.lastName?.[0] || ''}`}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg" data-testid="text-member-name">
+                      {memberData.user.firstName} {memberData.user.lastName}
+                    </h3>
+                    <p className="text-sm text-muted-foreground" data-testid="text-member-email">
+                      {memberData.user.email}
+                    </p>
                   </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Berlaku Hingga</span>
-                    </div>
-                    <span className="text-sm" data-testid="text-membership-enddate">
-                      {format(new Date(memberData.membership.endDate), "dd MMM yyyy")}
-                    </span>
-                  </div>
+                </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Check-in Time</span>
+                {/* Membership Info */}
+                {memberData.membership ? (
+                  <div className="space-y-3 pt-3 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Membership</span>
+                      </div>
+                      <Badge 
+                        variant={getMembershipStatus(memberData.membership.endDate).variant}
+                        data-testid="badge-membership-status"
+                      >
+                        {memberData.membership.plan.name}
+                      </Badge>
                     </div>
-                    <span className="text-sm" data-testid="text-checkin-time">
-                      {format(new Date(memberData.checkInTime), "HH:mm")}
-                    </span>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Berlaku Hingga</span>
+                      </div>
+                      <span className="text-sm" data-testid="text-membership-enddate">
+                        {format(new Date(memberData.membership.endDate), "dd MMM yyyy")}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="py-3 text-center border-t border-border">
-                  <Badge variant="destructive">Tidak ada membership aktif</Badge>
-                </div>
-              )}
+                ) : (
+                  <div className="py-3 text-center border-t border-border">
+                    <Badge variant="destructive">Tidak ada membership aktif</Badge>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

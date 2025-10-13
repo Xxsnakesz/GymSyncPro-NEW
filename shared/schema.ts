@@ -36,7 +36,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name").notNull(),
   phone: varchar("phone"),
   profileImageUrl: varchar("profile_image_url"),
-  permanentQrCode: varchar("permanent_qr_code").unique(),
+  permanentQrCode: varchar("permanent_qr_code"),
   role: varchar("role").default("member"), // member, admin
   active: boolean("active").default(true), // true = active, false = suspended
   stripeCustomerId: varchar("stripe_customer_id"),

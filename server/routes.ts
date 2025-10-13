@@ -236,18 +236,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const qrCode = randomUUID();
-      
-      const checkIn = await storage.createCheckIn({
-        userId,
-        qrCode,
-        status: 'active',
-      });
+      // Get or generate permanent QR code for user
+      const qrCode = await storage.ensureUserPermanentQrCode(userId);
 
-      res.json({ checkIn, qrCode });
+      res.json({ qrCode });
     } catch (error) {
-      console.error("Error generating check-in:", error);
-      res.status(500).json({ message: "Failed to generate check-in" });
+      console.error("Error generating QR code:", error);
+      res.status(500).json({ message: "Failed to generate QR code" });
     }
   });
 
@@ -829,10 +824,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'QR code is required' });
       }
 
-      const checkInData = await storage.validateCheckInQR(qrCode);
+      // Validate member QR code and create check-in if needed
+      const checkInData = await storage.validateMemberQrAndCheckIn(qrCode);
       
       if (!checkInData) {
-        return res.status(404).json({ message: 'Invalid or expired QR code' });
+        return res.status(404).json({ message: 'QR code tidak valid atau member tidak ditemukan' });
       }
 
       res.json(checkInData);
