@@ -250,17 +250,17 @@ export default function AdminCheckInModal({ open, onClose, onSuccess }: AdminChe
               <div className="border border-border rounded-lg p-4 space-y-4 bg-muted/30">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16" data-testid="img-member-avatar">
-                    <AvatarImage src={memberData.user.profileImageUrl} />
+                    <AvatarImage src={memberData.user?.profileImageUrl} />
                     <AvatarFallback>
-                      {`${memberData.user.firstName?.[0] || ''}${memberData.user.lastName?.[0] || ''}`}
+                      {`${memberData.user?.firstName?.[0] || ''}${memberData.user?.lastName?.[0] || ''}`}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg" data-testid="text-member-name">
-                      {memberData.user.firstName} {memberData.user.lastName}
+                      {memberData.user?.firstName} {memberData.user?.lastName}
                     </h3>
                     <p className="text-sm text-muted-foreground" data-testid="text-member-email">
-                      {memberData.user.email}
+                      {memberData.user?.email}
                     </p>
                   </div>
                 </div>
