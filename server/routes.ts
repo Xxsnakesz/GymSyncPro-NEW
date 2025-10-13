@@ -6,7 +6,8 @@ import passport from "passport";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
-import { insertMembershipPlanSchema, insertGymClassSchema, insertClassBookingSchema, insertCheckInSchema, insertPaymentSchema, registerSchema, loginSchema } from "@shared/schema";
+import { insertMembershipPlanSchema, insertGymClassSchema, insertClassBookingSchema, insertCheckInSchema, insertPaymentSchema, registerSchema, loginSchema, forgotPasswordRequestSchema, resetPasswordSchema } from "@shared/schema";
+import { sendPasswordResetEmail } from "./email/resend";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
@@ -181,6 +182,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ message: "Logout successful" });
     });
+  });
+
+  // Forgot Password route
+  app.post('/api/forgot-password', async (req, res) => {
+    try {
+      const validatedData = forgotPasswordRequestSchema.parse(req.body);
+      
+      // Check if user exists
+      const user = await storage.getUserByEmail(validatedData.email);
+      if (!user) {
+        // Don't reveal if email exists or not for security
+        return res.json({ message: "Jika email terdaftar, kode verifikasi telah dikirim" });
+      }
+
+      // Generate 6-digit verification code
+      const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store token in database
+      await storage.createPasswordResetToken(validatedData.email, resetToken);
+      
+      // Send email
+      await sendPasswordResetEmail(validatedData.email, resetToken);
+      
+      res.json({ message: "Kode verifikasi telah dikirim ke email Anda" });
+    } catch (error: any) {
+      console.error("Error in forgot password:", error);
+      res.status(400).json({ message: error.message || "Gagal mengirim kode verifikasi" });
+    }
+  });
+
+  // Reset Password route
+  app.post('/api/reset-password', async (req, res) => {
+    try {
+      const validatedData = resetPasswordSchema.parse(req.body);
+      
+      // Validate token
+      const resetToken = await storage.getPasswordResetToken(validatedData.token);
+      
+      if (!resetToken) {
+        return res.status(400).json({ message: "Kode verifikasi tidak valid" });
+      }
+      
+      if (resetToken.status !== 'valid') {
+        return res.status(400).json({ message: "Kode verifikasi sudah digunakan atau kadaluarsa" });
+      }
+      
+      if (new Date() > resetToken.expiresAt) {
+        await storage.markTokenAsUsed(validatedData.token);
+        return res.status(400).json({ message: "Kode verifikasi sudah kadaluarsa" });
+      }
+      
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(validatedData.newPassword, 10);
+      
+      // Update password
+      await storage.updateUserPassword(resetToken.email, hashedPassword);
+      
+      // Mark token as used
+      await storage.markTokenAsUsed(validatedData.token);
+      
+      res.json({ message: "Password berhasil direset. Silakan login dengan password baru Anda" });
+    } catch (error: any) {
+      console.error("Error in reset password:", error);
+      res.status(400).json({ message: error.message || "Gagal mereset password" });
+    }
   });
 
   // Auth routes
