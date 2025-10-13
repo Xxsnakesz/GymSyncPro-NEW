@@ -46,7 +46,10 @@ export interface IStorage {
   
   // Membership operations
   getMembershipPlans(): Promise<MembershipPlan[]>;
+  getAllMembershipPlans(): Promise<MembershipPlan[]>;
   createMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
+  updateMembershipPlan(id: string, plan: Partial<InsertMembershipPlan>): Promise<MembershipPlan>;
+  deleteMembershipPlan(id: string): Promise<void>;
   getUserMembership(userId: string): Promise<(Membership & { plan: MembershipPlan }) | undefined>;
   createMembership(membership: InsertMembership): Promise<Membership>;
   updateMembership(id: string, membership: Partial<InsertMembership>): Promise<void>;
@@ -180,9 +183,26 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(membershipPlans).where(eq(membershipPlans.active, true));
   }
 
+  async getAllMembershipPlans(): Promise<MembershipPlan[]> {
+    return await db.select().from(membershipPlans);
+  }
+
   async createMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan> {
     const [newPlan] = await db.insert(membershipPlans).values(plan).returning();
     return newPlan;
+  }
+
+  async updateMembershipPlan(id: string, plan: Partial<InsertMembershipPlan>): Promise<MembershipPlan> {
+    const [updatedPlan] = await db
+      .update(membershipPlans)
+      .set(plan)
+      .where(eq(membershipPlans.id, id))
+      .returning();
+    return updatedPlan;
+  }
+
+  async deleteMembershipPlan(id: string): Promise<void> {
+    await db.update(membershipPlans).set({ active: false }).where(eq(membershipPlans.id, id));
   }
 
   async getUserMembership(userId: string): Promise<(Membership & { plan: MembershipPlan }) | undefined> {

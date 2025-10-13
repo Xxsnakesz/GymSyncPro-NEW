@@ -600,6 +600,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/membership-plans', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const plans = await storage.getAllMembershipPlans();
+      res.json(plans);
+    } catch (error) {
+      console.error("Error fetching membership plans:", error);
+      res.status(500).json({ message: "Failed to fetch membership plans" });
+    }
+  });
+
   app.post('/api/admin/membership-plans', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -615,6 +632,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating membership plan:", error);
       res.status(500).json({ message: "Failed to create membership plan" });
+    }
+  });
+
+  app.put('/api/admin/membership-plans/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      const updateData = req.body;
+      
+      const plan = await storage.updateMembershipPlan(id, updateData);
+      res.json(plan);
+    } catch (error) {
+      console.error("Error updating membership plan:", error);
+      res.status(500).json({ message: "Failed to update membership plan" });
+    }
+  });
+
+  app.delete('/api/admin/membership-plans/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      await storage.deleteMembershipPlan(id);
+      res.json({ message: 'Membership plan deleted successfully' });
+    } catch (error) {
+      console.error("Error deleting membership plan:", error);
+      res.status(500).json({ message: "Failed to delete membership plan" });
     }
   });
 
