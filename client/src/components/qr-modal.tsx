@@ -60,7 +60,10 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
   // Generate QR code image when data changes
   useEffect(() => {
     if (currentQRData?.qrCode) {
-      QRCode.toDataURL(currentQRData.qrCode, {
+      // Create a URL for the QR code that member can scan to check-in
+      const checkInUrl = `${window.location.origin}/checkin/verify/${currentQRData.qrCode}`;
+      
+      QRCode.toDataURL(checkInUrl, {
         width: 256,
         margin: 2,
         color: {
@@ -163,7 +166,7 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
           </div>
           
           <p className="text-sm text-muted-foreground text-center">
-            Tunjukkan QR code ini ke resepsionis untuk check-in
+            Scan QR code ini untuk check-in otomatis
           </p>
           
           <div className="flex gap-3 w-full">

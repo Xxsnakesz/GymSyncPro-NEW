@@ -18,6 +18,7 @@ import AdminCheckIns from "@/pages/admin-checkins";
 import AdminFeedback from "@/pages/admin-feedback";
 import Checkout from "@/pages/checkout";
 import MyBookings from "@/pages/my-bookings";
+import CheckInVerify from "@/pages/checkin-verify";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -33,6 +34,9 @@ function Router() {
 
   return (
     <Switch>
+      {/* Public route for QR check-in verification */}
+      <Route path="/checkin/verify/:code" component={CheckInVerify} />
+      
       {!isAuthenticated ? (
         <>
           <Route path="/login" component={Login} />

@@ -267,6 +267,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public check-in verification endpoint (no auth required)
+  app.post('/api/checkin/verify', async (req, res) => {
+    try {
+      const { qrCode } = req.body;
+      
+      if (!qrCode) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Kode QR tidak valid' 
+        });
+      }
+
+      // Find user by QR code
+      const memberUser = await storage.getUserByPermanentQrCode(qrCode);
+      
+      if (!memberUser) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'QR code tidak valid atau member tidak ditemukan' 
+        });
+      }
+
+      // Sanitize user data - only return safe fields for display
+      const safeUserData = {
+        firstName: memberUser.firstName,
+        lastName: memberUser.lastName
+      };
+
+      // Check if user is suspended
+      if (memberUser.active === false) {
+        return res.json({
+          success: false,
+          user: safeUserData,
+          message: 'Akun Anda sedang dinonaktifkan. Silakan hubungi admin untuk informasi lebih lanjut.'
+        });
+      }
+
+      // Check membership status
+      const membership = await storage.getUserMembership(memberUser.id);
+      const now = new Date();
+      const hasActiveMembership = membership && new Date(membership.endDate) > now;
+
+      // If no active membership, return failure response with member info
+      if (!hasActiveMembership) {
+        return res.json({
+          success: false,
+          user: safeUserData,
+          message: 'Belum terdaftar membership atau membership sudah expired'
+        });
+      }
+
+      // Membership is active, create check-in
+      const checkInData = await storage.validateMemberQrAndCheckIn(qrCode);
+      
+      if (!checkInData) {
+        return res.status(500).json({ 
+          success: false,
+          message: 'Gagal membuat check-in' 
+        });
+      }
+
+      // Sanitize check-in data before returning
+      res.json({
+        success: true,
+        user: safeUserData,
+        checkIn: {
+          id: checkInData.id,
+          checkInTime: checkInData.checkInTime
+        }
+      });
+    } catch (error) {
+      console.error("Error verifying check-in:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Terjadi kesalahan saat check-in" 
+      });
+    }
+  });
+
   // Class routes
   app.get('/api/classes', isAuthenticated, async (req, res) => {
     try {
