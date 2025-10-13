@@ -123,7 +123,17 @@ export default function AdminCheckInModal({ open, onClose, onSuccess }: AdminChe
   // Start camera when modal opens
   useEffect(() => {
     if (open && !isScanning && !memberData) {
-      startScanner();
+      // Add a small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        if (scannerRef.current) {
+          stopScanner();
+        }
+      };
     }
     
     return () => {
