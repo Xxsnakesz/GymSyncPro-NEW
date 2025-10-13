@@ -189,6 +189,44 @@ export default function AdminDashboard() {
     retry: false,
   });
 
+  const suspendMutation = useMutation({
+    mutationFn: (memberId: string) => apiRequest("PUT", `/api/admin/members/${memberId}/suspend`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      toast({
+        title: "Berhasil!",
+        description: "Member berhasil dinonaktifkan",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal menonaktifkan member",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: (memberId: string) => apiRequest("PUT", `/api/admin/members/${memberId}/activate`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      toast({
+        title: "Berhasil!",
+        description: "Member berhasil diaktifkan kembali",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal mengaktifkan member",
+        variant: "destructive",
+      });
+    }
+  });
+
   if (isLoading || dashboardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -338,44 +376,6 @@ export default function AdminDashboard() {
       });
     }
   };
-
-  const suspendMutation = useMutation({
-    mutationFn: (memberId: string) => apiRequest("PUT", `/api/admin/members/${memberId}/suspend`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
-      toast({
-        title: "Berhasil!",
-        description: "Member berhasil dinonaktifkan",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Gagal menonaktifkan member",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const activateMutation = useMutation({
-    mutationFn: (memberId: string) => apiRequest("PUT", `/api/admin/members/${memberId}/activate`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
-      toast({
-        title: "Berhasil!",
-        description: "Member berhasil diaktifkan kembali",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Gagal mengaktifkan member",
-        variant: "destructive",
-      });
-    }
-  });
 
   const handleSuspendMember = async (memberId: string) => {
     if (!confirm("Apakah Anda yakin ingin menonaktifkan member ini sementara?")) {
