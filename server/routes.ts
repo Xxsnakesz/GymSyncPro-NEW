@@ -203,7 +203,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createPasswordResetToken(validatedData.email, resetToken);
       
       // Send email
-      await sendPasswordResetEmail(validatedData.email, resetToken);
+      const emailResult = await sendPasswordResetEmail(validatedData.email, resetToken);
+      
+      // Check if email was sent successfully
+      if (emailResult?.error) {
+        console.error('[Forgot Password] Email sending failed:', emailResult.error);
+        return res.status(500).json({ 
+          message: "Terjadi kesalahan saat mengirim email. Silakan hubungi administrator.",
+          details: emailResult.error.message 
+        });
+      }
       
       res.json({ message: "Kode verifikasi telah dikirim ke email Anda" });
     } catch (error: any) {

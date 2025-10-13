@@ -65,3 +65,10 @@ This structure enables type sharing between frontend and backend while maintaini
 - **TypeScript**: Type safety across the entire stack
 - **Drizzle ORM**: Type-safe database operations with migration support
 - **TanStack React Query**: Server state management and caching
+
+### Email Service
+- **Resend**: Transactional email service for password reset and notifications
+  - **Configuration Required**: Domain verification needed at https://resend.com/domains
+  - **Current Issue**: The configured sender domain (gmail.com) is not verified, causing email delivery failures
+  - **Impact**: Password reset emails are not being delivered to users
+  - **Solution**: Verify a custom domain in Resend or use Resend's default sender domain
