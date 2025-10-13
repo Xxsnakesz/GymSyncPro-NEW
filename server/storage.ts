@@ -70,6 +70,7 @@ export interface IStorage {
   getUserClassBookings(userId: string): Promise<(ClassBooking & { gymClass: GymClass })[]>;
   getAllClassBookings(): Promise<(ClassBooking & { user: User; gymClass: GymClass })[]>;
   bookClass(booking: InsertClassBooking): Promise<ClassBooking>;
+  updateClassBookingStatus(id: string, status: string): Promise<void>;
   cancelClassBooking(id: string): Promise<void>;
   
   // Check-in operations
@@ -385,6 +386,27 @@ export class DatabaseStorage implements IStorage {
       .where(eq(gymClasses.id, booking.classId));
     
     return newBooking;
+  }
+
+  async updateClassBookingStatus(id: string, status: string): Promise<void> {
+    const [booking] = await db.select().from(classBookings).where(eq(classBookings.id, id));
+    
+    if (!booking) {
+      return;
+    }
+
+    await db.update(classBookings).set({ status }).where(eq(classBookings.id, id));
+    
+    // Update class enrollment count
+    const currentBookings = await db
+      .select({ count: count() })
+      .from(classBookings)
+      .where(and(eq(classBookings.classId, booking.classId), eq(classBookings.status, "booked")));
+    
+    await db
+      .update(gymClasses)
+      .set({ currentEnrollment: currentBookings[0]?.count || 0 })
+      .where(eq(gymClasses.id, booking.classId));
   }
 
   async cancelClassBooking(id: string): Promise<void> {

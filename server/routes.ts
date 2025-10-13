@@ -971,6 +971,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/admin/class-bookings/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ message: 'Status is required' });
+      }
+
+      await storage.updateClassBookingStatus(id, status);
+      res.json({ message: 'Class booking updated successfully' });
+    } catch (error) {
+      console.error("Error updating class booking:", error);
+      res.status(500).json({ message: "Failed to update class booking" });
+    }
+  });
+
+  app.delete('/api/admin/class-bookings/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { id } = req.params;
+      await storage.cancelClassBooking(id);
+      res.json({ message: 'Class booking cancelled successfully' });
+    } catch (error) {
+      console.error("Error cancelling class booking:", error);
+      res.status(500).json({ message: "Failed to cancel class booking" });
+    }
+  });
+
   // Admin Check-in routes
   app.post('/api/admin/checkin/validate', isAuthenticated, async (req: any, res) => {
     try {
