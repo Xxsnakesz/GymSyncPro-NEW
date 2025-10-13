@@ -123,7 +123,7 @@ export default function AdminTrainers() {
                 <CardHeader>
                   <div className="flex items-start gap-4">
                     <Avatar className="h-16 w-16">
-                      <AvatarImage src={trainer.imageUrl} />
+                      <AvatarImage src={trainer.imageUrl || undefined} />
                       <AvatarFallback className="text-lg">
                         {trainer.name?.[0] || 'T'}
                       </AvatarFallback>
