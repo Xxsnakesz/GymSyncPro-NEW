@@ -34,6 +34,8 @@ import {
   MessageSquare,
   Star,
   Dumbbell,
+  UserX,
+  UserCheck,
 } from "lucide-react";
 
 interface AdminDashboardStats {
@@ -60,6 +62,7 @@ interface MemberWithMembership {
   firstName?: string;
   lastName?: string;
   profileImageUrl?: string;
+  active?: boolean;
   membership?: {
     status?: string;
     endDate?: string;
@@ -336,6 +339,46 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSuspendMember = async (memberId: string) => {
+    if (!confirm("Apakah Anda yakin ingin menonaktifkan member ini sementara?")) {
+      return;
+    }
+
+    try {
+      await apiRequest("PUT", `/api/admin/members/${memberId}/suspend`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      toast({
+        title: "Berhasil!",
+        description: "Member berhasil dinonaktifkan",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal menonaktifkan member",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleActivateMember = async (memberId: string) => {
+    try {
+      await apiRequest("PUT", `/api/admin/members/${memberId}/activate`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      toast({
+        title: "Berhasil!",
+        description: "Member berhasil diaktifkan kembali",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Gagal mengaktifkan member",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAddMembershipPlan = () => {
     setSelectedMembershipPlan(null);
     setShowMembershipPlanDialog(true);
@@ -590,6 +633,27 @@ export default function AdminDashboard() {
                                 >
                                   <Edit size={16} />
                                 </Button>
+                                {member.active !== false ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleSuspendMember(member.id)}
+                                    data-testid={`button-suspend-${member.id}`}
+                                    title="Nonaktifkan sementara"
+                                  >
+                                    <UserX size={16} className="text-orange-500" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleActivateMember(member.id)}
+                                    data-testid={`button-activate-${member.id}`}
+                                    title="Aktifkan kembali"
+                                  >
+                                    <UserCheck size={16} className="text-green-500" />
+                                  </Button>
+                                )}
                                 <Button
                                   variant="outline"
                                   size="sm"
