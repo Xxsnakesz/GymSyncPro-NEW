@@ -13,6 +13,13 @@ Preferred communication style: Simple, everyday language.
 ### Frontend Architecture
 The client application uses React with TypeScript, built with Vite for development and bundling. The UI follows a component-based architecture using shadcn/ui components with Radix UI primitives and Tailwind CSS for styling. State management is handled through TanStack React Query for server state and React hooks for local state. Routing is implemented with Wouter for a lightweight solution.
 
+#### UI/UX Design
+The application features modern, responsive design with:
+- **Authentication Pages**: Split-screen layouts with gradient backgrounds, glassmorphism effects, and hero sections featuring brand messaging. All forms include icon-enhanced inputs, password visibility toggles, and smooth transitions.
+- **Password Security**: Real-time password strength indicators on registration forms with visual feedback (weak/medium/strong) based on length, character variety, and complexity.
+- **Cookie Consent System**: GDPR-compliant cookie management with consent banner, granular preference controls, and persistent storage. Users can customize analytics, marketing, and preference cookies independently.
+- **Responsive Design**: Mobile-first approach with adaptive layouts that progressively enhance for larger screens, ensuring optimal UX across all devices.
+
 ### Backend Architecture
 The server uses Express.js with TypeScript in an ESM environment. The API follows RESTful patterns with route-based organization. Authentication is implemented using OpenID Connect (OIDC) with Replit's authentication service, utilizing Passport.js for session management. Session storage is handled by connect-pg-simple with PostgreSQL backing.
 
