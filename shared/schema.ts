@@ -37,6 +37,7 @@ export const users = pgTable("users", {
   phone: varchar("phone"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").default("member"), // member, admin
+  active: boolean("active").default(true), // true = active, false = suspended
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   createdAt: timestamp("created_at").defaultNow(),
