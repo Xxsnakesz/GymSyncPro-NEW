@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -339,44 +339,53 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSuspendMember = async (memberId: string) => {
-    if (!confirm("Apakah Anda yakin ingin menonaktifkan member ini sementara?")) {
-      return;
-    }
-
-    try {
-      await apiRequest("PUT", `/api/admin/members/${memberId}/suspend`);
+  const suspendMutation = useMutation({
+    mutationFn: (memberId: string) => apiRequest("PUT", `/api/admin/members/${memberId}/suspend`),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
       toast({
         title: "Berhasil!",
         description: "Member berhasil dinonaktifkan",
       });
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Gagal menonaktifkan member",
         variant: "destructive",
       });
     }
-  };
+  });
 
-  const handleActivateMember = async (memberId: string) => {
-    try {
-      await apiRequest("PUT", `/api/admin/members/${memberId}/activate`);
+  const activateMutation = useMutation({
+    mutationFn: (memberId: string) => apiRequest("PUT", `/api/admin/members/${memberId}/activate`),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
       toast({
         title: "Berhasil!",
         description: "Member berhasil diaktifkan kembali",
       });
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Gagal mengaktifkan member",
         variant: "destructive",
       });
     }
+  });
+
+  const handleSuspendMember = async (memberId: string) => {
+    if (!confirm("Apakah Anda yakin ingin menonaktifkan member ini sementara?")) {
+      return;
+    }
+    suspendMutation.mutate(memberId);
+  };
+
+  const handleActivateMember = async (memberId: string) => {
+    activateMutation.mutate(memberId);
   };
 
   const handleAddMembershipPlan = () => {
