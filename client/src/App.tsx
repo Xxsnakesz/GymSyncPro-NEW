@@ -43,6 +43,18 @@ function Router() {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/checkout" component={Checkout} />
           <Route path="/my-bookings" component={MyBookings} />
+          <Route path="/login">
+            <Redirect to="/" />
+          </Route>
+          <Route path="/login-admin">
+            <Redirect to="/" />
+          </Route>
+          <Route path="/register">
+            <Redirect to="/" />
+          </Route>
+          <Route path="/register-admin">
+            <Redirect to="/" />
+          </Route>
         </>
       )}
       <Route component={NotFound} />
