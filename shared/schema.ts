@@ -249,6 +249,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 // Register schema with validation
 export const registerSchema = insertUserSchema.omit({
   role: true,
+  active: true,
   stripeCustomerId: true,
   stripeSubscriptionId: true,
   profileImageUrl: true,

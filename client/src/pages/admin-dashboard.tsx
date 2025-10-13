@@ -596,9 +596,16 @@ export default function AdminDashboard() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="ml-4">
-                                  <p className="text-sm font-medium text-foreground">
-                                    {`${member.firstName || ''} ${member.lastName || ''}`.trim() || 'No Name'}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-foreground">
+                                      {`${member.firstName || ''} ${member.lastName || ''}`.trim() || 'No Name'}
+                                    </p>
+                                    {member.active === false && (
+                                      <Badge variant="outline" className="text-orange-600 border-orange-600">
+                                        Suspended
+                                      </Badge>
+                                    )}
+                                  </div>
                                   <p className="text-sm text-muted-foreground">{member.email}</p>
                                 </div>
                               </div>
@@ -633,7 +640,7 @@ export default function AdminDashboard() {
                                 >
                                   <Edit size={16} />
                                 </Button>
-                                {member.active !== false ? (
+                                {(member.active ?? true) ? (
                                   <Button
                                     variant="outline"
                                     size="sm"

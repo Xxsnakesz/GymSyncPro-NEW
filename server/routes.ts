@@ -227,6 +227,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/checkin/generate', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      
+      // Check if user is suspended
+      const user = await storage.getUser(userId);
+      if (user?.active === false) {
+        return res.status(403).json({ 
+          message: "Akun Anda sedang dinonaktifkan. Silakan hubungi admin untuk informasi lebih lanjut." 
+        });
+      }
+      
       const qrCode = randomUUID();
       
       const checkIn = await storage.createCheckIn({
@@ -566,8 +575,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
-      await storage.updateUser(id, { active: false });
-      res.json({ message: 'Member suspended successfully' });
+      const updatedMember = await storage.updateUser(id, { active: false });
+      res.json({ 
+        message: 'Member suspended successfully',
+        member: { ...updatedMember, password: undefined }
+      });
     } catch (error) {
       console.error("Error suspending member:", error);
       res.status(500).json({ message: "Failed to suspend member" });
@@ -584,8 +596,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
-      await storage.updateUser(id, { active: true });
-      res.json({ message: 'Member activated successfully' });
+      const updatedMember = await storage.updateUser(id, { active: true });
+      res.json({ 
+        message: 'Member activated successfully',
+        member: { ...updatedMember, password: undefined }
+      });
     } catch (error) {
       console.error("Error activating member:", error);
       res.status(500).json({ message: "Failed to activate member" });
