@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { QrCode, User, Calendar, CreditCard, Clock, CheckCircle2, Camera } from "lucide-react";
+import { QrCode, User, Calendar, CreditCard, Clock, CheckCircle2, Camera, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { Html5Qrcode } from "html5-qrcode";
 
@@ -37,15 +37,25 @@ export default function AdminCheckInModal({ open, onClose, onSuccess }: AdminChe
     },
     onSuccess: (data) => {
       setMemberData(data);
-      toast({
-        title: "Check-in Valid",
-        description: `Member ${data.user.firstName} ${data.user.lastName} berhasil divalidasi`,
-      });
-      // Stop scanner after successful scan
-      stopScanner();
-      if (onSuccess) {
-        onSuccess();
+      
+      if (data.success) {
+        toast({
+          title: "Check-in Berhasil",
+          description: `Member ${data.user.firstName} ${data.user.lastName} berhasil check-in`,
+        });
+        if (onSuccess) {
+          onSuccess();
+        }
+      } else {
+        toast({
+          title: "Check-in Gagal",
+          description: data.message || "Membership tidak aktif",
+          variant: "destructive",
+        });
       }
+      
+      // Stop scanner after scan
+      stopScanner();
     },
     onError: (error: any) => {
       toast({
@@ -193,21 +203,35 @@ export default function AdminCheckInModal({ open, onClose, onSuccess }: AdminChe
             </div>
           )}
 
-          {/* Success State - Check-in Berhasil */}
+          {/* Check-in Result State */}
           {memberData && (
             <div className="space-y-4">
-              {/* Success Header with Large Checkmark */}
-              <div className="flex flex-col items-center justify-center py-6 bg-green-50 dark:bg-green-950/20 rounded-lg border-2 border-green-500">
-                <div className="bg-green-500 rounded-full p-4 mb-4">
-                  <CheckCircle2 className="w-12 h-12 text-white" data-testid="icon-success-checkmark" />
+              {/* Result Header */}
+              {memberData.success ? (
+                <div className="flex flex-col items-center justify-center py-6 bg-green-50 dark:bg-green-950/20 rounded-lg border-2 border-green-500">
+                  <div className="bg-green-500 rounded-full p-4 mb-4">
+                    <CheckCircle2 className="w-12 h-12 text-white" data-testid="icon-success-checkmark" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-success-message">
+                    CHECK-IN BERHASIL
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-2" data-testid="text-checkin-time">
+                    {format(new Date(memberData.checkInTime), "HH:mm, dd MMMM yyyy")}
+                  </p>
                 </div>
-                <h3 className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-success-message">
-                  CHECK-IN BERHASIL
-                </h3>
-                <p className="text-sm text-muted-foreground mt-2" data-testid="text-checkin-time">
-                  {format(new Date(memberData.checkInTime), "HH:mm, dd MMMM yyyy")}
-                </p>
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 bg-red-50 dark:bg-red-950/20 rounded-lg border-2 border-red-500">
+                  <div className="bg-red-500 rounded-full p-4 mb-4">
+                    <XCircle className="w-12 h-12 text-white" data-testid="icon-fail-cross" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="text-fail-message">
+                    CHECK-IN GAGAL
+                  </h3>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-2" data-testid="text-fail-reason">
+                    {memberData.message || "Belum Terdaftar Membership"}
+                  </p>
+                </div>
+              )}
 
               {/* Member Information */}
               <div className="border border-border rounded-lg p-4 space-y-4 bg-muted/30">
