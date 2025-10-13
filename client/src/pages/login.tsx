@@ -12,6 +12,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { Eye, EyeOff, User, Lock, Dumbbell, Sparkles, ArrowRight } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import idachiLogo from "@assets/image_1759411904981.png";
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -26,6 +27,7 @@ export default function Login() {
     defaultValues: {
       username: "",
       password: "",
+      rememberMe: false,
     },
   });
 
@@ -193,6 +195,35 @@ export default function Login() {
                         </FormItem>
                       )}
                     />
+
+                    <div className="flex items-center justify-between">
+                      <FormField
+                        control={form.control}
+                        name="rememberMe"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center space-x-2">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="border-gray-400 data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
+                                data-testid="checkbox-remember"
+                              />
+                            </FormControl>
+                            <FormLabel className="text-sm text-gray-600 dark:text-gray-400 font-normal cursor-pointer">
+                              Remember Me
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      <Link 
+                        href="/forgot-password" 
+                        className="text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 font-medium transition-colors"
+                        data-testid="link-forgot-password"
+                      >
+                        Lupa Password?
+                      </Link>
+                    </div>
 
                     <Button
                       type="submit"

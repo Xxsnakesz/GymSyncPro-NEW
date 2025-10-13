@@ -285,6 +285,7 @@ export const registerSchema = insertUserSchema.omit({
 export const loginSchema = z.object({
   username: z.string().min(1, "Username diperlukan"),
   password: z.string().min(1, "Password diperlukan"),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export const insertMembershipPlanSchema = createInsertSchema(membershipPlans).omit({

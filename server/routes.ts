@@ -148,6 +148,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Login route
   app.post('/api/login', (req, res, next) => {
+    const { rememberMe } = req.body;
+    
     passport.authenticate('local', (err: any, user: any, info: any) => {
       if (err) {
         return res.status(500).json({ message: "Login error" });
@@ -159,6 +161,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (err) {
           return res.status(500).json({ message: "Login error" });
         }
+        
+        // Extend session if remember me is checked
+        if (rememberMe && req.session.cookie) {
+          // Set cookie to expire in 30 days instead of default session lifetime
+          req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+        }
+        
         res.json({ message: "Login successful", user: { ...user, password: undefined } });
       });
     })(req, res, next);
