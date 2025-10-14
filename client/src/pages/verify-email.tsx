@@ -64,10 +64,12 @@ export default function VerifyEmail() {
   };
 
   const handleResendCode = async () => {
-    if (!emailFromUrl) {
+    const currentEmail = form.getValues('email');
+    
+    if (!currentEmail) {
       toast({
         title: "Error",
-        description: "Email tidak ditemukan",
+        description: "Mohon masukkan email Anda terlebih dahulu",
         variant: "destructive",
       });
       return;
@@ -75,7 +77,7 @@ export default function VerifyEmail() {
 
     setIsResending(true);
     try {
-      await apiRequest("POST", "/api/resend-verification-code", { email: emailFromUrl });
+      await apiRequest("POST", "/api/resend-verification-code", { email: currentEmail });
       toast({
         title: "Kode Terkirim!",
         description: "Kode verifikasi baru telah dikirim ke email Anda",
@@ -132,22 +134,45 @@ export default function VerifyEmail() {
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem className="hidden">
-                        <FormControl>
-                          <Input
-                            type="email"
-                            data-testid="input-email"
-                            readOnly
-                            {...field}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  {!emailFromUrl && (
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder="nama@gmail.com"
+                              className="h-12 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                              data-testid="input-email"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  {emailFromUrl && (
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormControl>
+                            <Input
+                              type="email"
+                              data-testid="input-email-hidden"
+                              readOnly
+                              {...field}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <FormField
                     control={form.control}
