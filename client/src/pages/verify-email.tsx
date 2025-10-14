@@ -22,6 +22,7 @@ export default function VerifyEmail() {
   const searchParams = useSearch();
   const urlParams = new URLSearchParams(searchParams);
   const emailFromUrl = urlParams.get('email') || '';
+  const [isResending, setIsResending] = useState(false);
 
   const form = useForm<VerifyEmailFormData>({
     resolver: zodResolver(verifyEmailSchema),
@@ -62,6 +63,34 @@ export default function VerifyEmail() {
     verifyMutation.mutate(data);
   };
 
+  const handleResendCode = async () => {
+    if (!emailFromUrl) {
+      toast({
+        title: "Error",
+        description: "Email tidak ditemukan",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsResending(true);
+    try {
+      await apiRequest("POST", "/api/resend-verification-code", { email: emailFromUrl });
+      toast({
+        title: "Kode Terkirim!",
+        description: "Kode verifikasi baru telah dikirim ke email Anda",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Gagal Mengirim Kode",
+        description: error.message || "Terjadi kesalahan saat mengirim kode verifikasi",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-100 dark:from-gray-950 dark:via-yellow-950 dark:to-amber-950 relative overflow-hidden">
       {/* Animated background elements */}
@@ -90,7 +119,7 @@ export default function VerifyEmail() {
                 Verifikasi Email
               </CardTitle>
               <CardDescription className="text-center text-base">
-                Masukkan kode verifikasi 6 digit yang telah dikirim ke email Anda
+                Masukkan kode verifikasi yang telah dikirim ke email Anda
               </CardDescription>
             </CardHeader>
             
@@ -107,18 +136,15 @@ export default function VerifyEmail() {
                     control={form.control}
                     name="email"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">Email</FormLabel>
+                      <FormItem className="hidden">
                         <FormControl>
                           <Input
                             type="email"
-                            className="h-12 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
                             data-testid="input-email"
                             readOnly
                             {...field}
                           />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -164,18 +190,29 @@ export default function VerifyEmail() {
                       </span>
                     )}
                   </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 border-yellow-500 dark:border-yellow-600 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-950/30"
+                    onClick={handleResendCode}
+                    disabled={isResending}
+                    data-testid="button-resend-code"
+                  >
+                    {isResending ? (
+                      <span className="flex items-center gap-2">
+                        <div className="h-5 w-5 border-3 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin" />
+                        Mengirim ulang...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Mail className="h-5 w-5" />
+                        Kirim Ulang Kode
+                      </span>
+                    )}
+                  </Button>
                 </form>
               </Form>
-
-              <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-                <p>Tidak menerima email?</p>
-                <p className="mt-1">
-                  Cek folder spam Anda atau{" "}
-                  <Link href="/register" className="text-yellow-600 dark:text-yellow-400 hover:underline font-medium">
-                    daftar ulang
-                  </Link>
-                </p>
-              </div>
             </CardContent>
           </Card>
         </div>

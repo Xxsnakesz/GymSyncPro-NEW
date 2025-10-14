@@ -193,6 +193,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend verification code route
+  app.post('/api/resend-verification-code', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email diperlukan" });
+      }
+
+      // Check if user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User tidak ditemukan" });
+      }
+
+      // Check if user is already verified
+      if (user.emailVerified) {
+        return res.status(400).json({ message: "Email sudah diverifikasi" });
+      }
+
+      // Generate new 6-digit verification code
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store new verification code
+      await storage.storeVerificationCode(email, verificationCode);
+      
+      // Send verification email
+      const { sendVerificationEmail } = await import('./email/resend');
+      await sendVerificationEmail(email, verificationCode);
+
+      res.json({ 
+        message: "Kode verifikasi baru telah dikirim ke email Anda",
+        success: true
+      });
+    } catch (error: any) {
+      console.error("Error during resend verification:", error);
+      res.status(500).json({ message: error.message || "Gagal mengirim ulang kode verifikasi" });
+    }
+  });
+
   // Login route
   app.post('/api/login', (req, res, next) => {
     const { rememberMe } = req.body;
