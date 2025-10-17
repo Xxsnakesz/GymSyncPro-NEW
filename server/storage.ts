@@ -168,6 +168,10 @@ export interface IStorage {
   markNotificationAsRead(id: string, userId: string): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
   deleteNotification(id: string, userId: string): Promise<void>;
+  
+  // Inactive member operations
+  getInactiveMembers(daysInactive: number): Promise<(User & { membership: Membership & { plan: MembershipPlan } })[]>;
+  sendInactivityReminders(daysInactive: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1725,6 +1729,69 @@ export class DatabaseStorage implements IStorage {
         eq(notifications.id, id),
         eq(notifications.userId, userId)
       ));
+  }
+
+  // Inactive member operations
+  async getInactiveMembers(daysInactive: number): Promise<(User & { membership: Membership & { plan: MembershipPlan } })[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysInactive);
+
+    const usersWithMemberships = await db
+      .select({
+        user: users,
+        membership: memberships,
+        plan: membershipPlans,
+      })
+      .from(users)
+      .innerJoin(memberships, eq(users.id, memberships.userId))
+      .innerJoin(membershipPlans, eq(memberships.planId, membershipPlans.id))
+      .where(and(
+        eq(memberships.status, 'active'),
+        eq(users.active, true)
+      ));
+
+    const inactiveMembers: (User & { membership: Membership & { plan: MembershipPlan } })[] = [];
+
+    for (const item of usersWithMemberships) {
+      const [recentCheckIn] = await db
+        .select()
+        .from(checkIns)
+        .where(and(
+          eq(checkIns.userId, item.user.id),
+          gte(checkIns.checkInTime, cutoffDate)
+        ))
+        .limit(1);
+
+      if (!recentCheckIn) {
+        inactiveMembers.push({
+          ...item.user,
+          membership: {
+            ...item.membership,
+            plan: item.plan
+          }
+        });
+      }
+    }
+
+    return inactiveMembers;
+  }
+
+  async sendInactivityReminders(daysInactive: number): Promise<number> {
+    const inactiveMembers = await this.getInactiveMembers(daysInactive);
+    let reminderCount = 0;
+
+    for (const member of inactiveMembers) {
+      await this.createNotification({
+        userId: member.id,
+        title: 'Ayo Ngegym Lagi! 💪',
+        message: `Sudah ${daysInactive} hari kamu tidak ngegym. Yuk, lanjutkan perjalanan fitness kamu!`,
+        type: 'inactivity_reminder',
+        relatedId: member.membership.id,
+      });
+      reminderCount++;
+    }
+
+    return reminderCount;
   }
 }
 
