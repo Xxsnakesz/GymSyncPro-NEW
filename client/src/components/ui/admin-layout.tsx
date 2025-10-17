@@ -9,7 +9,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ user, notificationCount = 0, children }: AdminLayoutProps) {
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <Navigation 
         user={user} 
         isAdmin={true}
@@ -20,7 +20,7 @@ export default function AdminLayout({ user, notificationCount = 0, children }: A
         <AdminSidebar />
         
         <main className="flex-1 overflow-auto">
-          <div className="p-6 max-w-7xl mx-auto">
+          <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
             {children}
           </div>
         </main>
