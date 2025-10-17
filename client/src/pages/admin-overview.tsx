@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -16,13 +16,14 @@ import {
   DollarSign,
   QrCode,
   TrendingUp,
-  Clock,
   Bell,
-  ArrowUpRight,
   Sparkles,
-  Activity
+  Activity,
+  ArrowRight,
+  Zap
 } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface AdminDashboardStats {
   totalMembers?: number;
@@ -113,9 +114,12 @@ export default function AdminOverview() {
   if (isLoading || dashboardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-2">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-          <p className="text-xs text-muted-foreground">Loading...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-500/20" />
+            <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -129,259 +133,255 @@ export default function AdminOverview() {
 
   return (
     <AdminLayout user={user} notificationCount={stats.expiringSoon || 0}>
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div className="space-y-0">
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400">
-                Dashboard
-              </h1>
-              <Sparkles className="w-4 h-4 text-purple-500" />
+      <div className="space-y-8">
+        {/* Hero Header */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-3xl blur-3xl" />
+          <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6 p-8 rounded-3xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                  Dashboard
+                </h1>
+              </div>
+              <p className="text-slate-600 dark:text-slate-400 text-lg ml-15">Welcome back! Here's your gym performance today</p>
             </div>
-            <p className="text-muted-foreground text-xs">Welcome back! Here's what's happening</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={() => sendReminderMutation.mutate()}
-              disabled={sendReminderMutation.isPending}
-              variant="outline"
-              size="sm"
-              className="group h-8 text-xs"
-              data-testid="button-send-reminder"
-            >
-              {sendReminderMutation.isPending ? (
-                <>
-                  <div className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full mr-1.5" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Bell className="mr-1.5 group-hover:animate-bounce" size={12} />
-                  Send Reminder
-                </>
-              )}
-            </Button>
-            <Button 
-              onClick={() => setShowCheckInModal(true)}
-              size="sm"
-              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 shadow-md h-8 text-xs"
-              data-testid="button-validate-checkin"
-            >
-              <QrCode className="mr-1.5" size={12} />
-              Scan QR
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={() => sendReminderMutation.mutate()}
+                disabled={sendReminderMutation.isPending}
+                variant="outline"
+                className="group border-2 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-all"
+                data-testid="button-send-reminder"
+              >
+                {sendReminderMutation.isPending ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full mr-2" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Bell className="mr-2 group-hover:animate-bounce" size={16} />
+                    Send Reminder
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={() => setShowCheckInModal(true)}
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all"
+                data-testid="button-validate-checkin"
+              >
+                <QrCode className="mr-2" size={16} />
+                Scan QR Code
+                <Zap className="ml-2 w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30">
-            <CardContent className="p-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-0.5 flex-1">
-                  <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400">Total Members</p>
-                  <div className="flex items-baseline gap-1">
-                    <p className="text-xl font-bold text-foreground" data-testid="text-total-members">
-                      {stats.totalMembers || 0}
-                    </p>
-                    <div className="flex items-center text-green-600 dark:text-green-400">
-                      <TrendingUp className="w-2.5 h-2.5" />
-                      <span className="text-[9px] font-medium ml-0.5">+12%</span>
-                    </div>
+        {/* Modern Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {/* Total Members */}
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-blue-500 to-blue-600 hover:shadow-2xl hover:shadow-blue-500/25 transition-all duration-300 cursor-pointer hover:-translate-y-1">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20" />
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Users className="w-7 h-7 text-white" />
+                </div>
+                <div className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm">
+                  <div className="flex items-center gap-1 text-white">
+                    <TrendingUp className="w-3 h-3" />
+                    <span className="text-xs font-bold">+12%</span>
                   </div>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                  <Users className="text-white" size={16} />
-                </div>
               </div>
-            </CardContent>
+              <div>
+                <p className="text-white/80 text-sm font-medium mb-1">Total Members</p>
+                <p className="text-4xl font-bold text-white" data-testid="text-total-members">{stats.totalMembers || 0}</p>
+                <p className="text-white/60 text-xs mt-2">This month performance</p>
+              </div>
+            </div>
           </Card>
 
-          <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
-            <CardContent className="p-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-0.5 flex-1">
-                  <p className="text-[10px] font-medium text-green-600 dark:text-green-400">Active Today</p>
-                  <div className="flex items-baseline gap-1">
-                    <p className="text-xl font-bold text-foreground" data-testid="text-active-today">
-                      {stats.activeToday || 0}
-                    </p>
-                    <Activity className="w-3.5 h-3.5 text-green-500 animate-pulse" />
+          {/* Active Today */}
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-green-500 to-emerald-600 hover:shadow-2xl hover:shadow-green-500/25 transition-all duration-300 cursor-pointer hover:-translate-y-1">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20" />
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <CalendarCheck className="w-7 h-7 text-white" />
+                </div>
+                <Activity className="w-6 h-6 text-white animate-pulse" />
+              </div>
+              <div>
+                <p className="text-white/80 text-sm font-medium mb-1">Active Today</p>
+                <p className="text-4xl font-bold text-white" data-testid="text-active-today">{stats.activeToday || 0}</p>
+                <p className="text-white/60 text-xs mt-2">Check-ins today</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Expiring Soon */}
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-orange-500 to-red-600 hover:shadow-2xl hover:shadow-orange-500/25 transition-all duration-300 cursor-pointer hover:-translate-y-1">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20" />
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <TriangleAlert className="w-7 h-7 text-white" />
+                </div>
+                <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+              </div>
+              <div>
+                <p className="text-white/80 text-sm font-medium mb-1">Expiring Soon</p>
+                <p className="text-4xl font-bold text-white" data-testid="text-expiring-soon">{stats.expiringSoon || 0}</p>
+                <p className="text-white/60 text-xs mt-2">{"< 20 days remaining"}</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Monthly Revenue */}
+          <Card className="group relative overflow-hidden border-0 bg-gradient-to-br from-purple-500 to-pink-600 hover:shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 cursor-pointer hover:-translate-y-1">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20" />
+            <div className="relative p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <DollarSign className="w-7 h-7 text-white" />
+                </div>
+                <div className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm">
+                  <div className="flex items-center gap-1 text-white">
+                    <TrendingUp className="w-3 h-3" />
+                    <span className="text-xs font-bold">+8%</span>
                   </div>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                  <CalendarCheck className="text-white" size={16} />
-                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30">
-            <CardContent className="p-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-0.5 flex-1">
-                  <p className="text-[10px] font-medium text-orange-600 dark:text-orange-400">Expiring Soon</p>
-                  <p className="text-xl font-bold text-foreground" data-testid="text-expiring-soon">
-                    {stats.expiringSoon || 0}
-                  </p>
-                </div>
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                  <TriangleAlert className="text-white" size={16} />
-                </div>
+              <div>
+                <p className="text-white/80 text-sm font-medium mb-1">Monthly Revenue</p>
+                <p className="text-4xl font-bold text-white" data-testid="text-monthly-revenue">${stats.revenue?.thisMonth || 0}</p>
+                <p className="text-white/60 text-xs mt-2">vs last month</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
-            <CardContent className="p-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-0.5 flex-1">
-                  <p className="text-[10px] font-medium text-purple-600 dark:text-purple-400">Revenue</p>
-                  <div className="flex items-baseline gap-1">
-                    <p className="text-xl font-bold text-foreground" data-testid="text-monthly-revenue">
-                      ${stats.revenue?.thisMonth || 0}
-                    </p>
-                    <div className="flex items-center text-green-600 dark:text-green-400">
-                      <TrendingUp className="w-2.5 h-2.5" />
-                      <span className="text-[9px] font-medium ml-0.5">+8%</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                  <DollarSign className="text-white" size={16} />
-                </div>
-              </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
 
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <Card className="lg:col-span-2 border-0 shadow-md">
-            <CardHeader className="pb-2 px-3 pt-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <Activity className="w-3.5 h-3.5 text-white" />
+        {/* Activity & Quick Actions Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Recent Activity - Takes 2 columns */}
+          <Card className="xl:col-span-2 border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm shadow-xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                    <Activity className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-sm">Recent Activity</CardTitle>
-                    <p className="text-[10px] text-muted-foreground mt-0">Latest check-ins</p>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Recent Activity</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Latest member check-ins</p>
                   </div>
                 </div>
                 <Button 
                   variant="ghost" 
-                  size="sm" 
-                  className="gap-1 h-7 text-[10px] px-2"
+                  className="gap-2 hover:gap-3 transition-all group"
                   data-testid="button-view-all-checkins"
                   onClick={() => window.location.href = '/admin/checkins'}
                 >
                   View All
-                  <ArrowUpRight className="w-3 h-3" />
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              {!recentCheckIns || recentCheckIns.length === 0 ? (
-                <div className="text-center py-6">
-                  <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-muted flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-muted-foreground" />
+
+              <div className="space-y-3">
+                {!recentCheckIns || recentCheckIns.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center">
+                      <Activity className="w-10 h-10 text-slate-400" />
+                    </div>
+                    <p className="text-slate-500 dark:text-slate-400">No recent check-ins</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">No recent check-ins</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {recentCheckIns.slice(0, 5).map((checkin) => (
+                ) : (
+                  recentCheckIns.slice(0, 5).map((checkin) => (
                     <div 
                       key={checkin.id} 
-                      className="group flex items-center justify-between p-2 rounded-lg bg-gradient-to-r from-muted/30 to-transparent hover:from-muted/60 hover:to-muted/20 transition-all cursor-pointer border border-transparent hover:border-border"
+                      className="group flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-transparent dark:from-slate-800/50 dark:to-transparent hover:from-blue-50 dark:hover:from-blue-950/20 hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-4">
                         <div className="relative">
-                          <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
+                          <Avatar className="h-12 w-12 border-2 border-white dark:border-slate-700 shadow-md ring-2 ring-blue-500/20">
                             <AvatarImage src={checkin.user?.profileImageUrl} />
-                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold text-[10px]">
+                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
                               {`${checkin.user?.firstName?.[0] || ''}${checkin.user?.lastName?.[0] || ''}`}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border border-background flex items-center justify-center">
-                            <CalendarCheck className="w-2 h-2 text-white" />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center">
+                            <CalendarCheck className="w-3 h-3 text-white" />
                           </div>
                         </div>
                         <div>
-                          <p className="font-medium text-xs text-foreground group-hover:text-primary transition-colors">
+                          <p className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                             {checkin.user?.firstName} {checkin.user?.lastName}
                           </p>
-                          <Badge variant="outline" className="text-[9px] mt-0.5 h-4">
+                          <Badge variant="outline" className="mt-1 border-slate-300 dark:border-slate-600 text-xs">
                             {checkin.membership?.plan?.name || 'No Plan'}
                           </Badge>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-xs text-foreground">
+                        <p className="font-bold text-slate-900 dark:text-white">
                           {format(new Date(checkin.checkInTime), 'HH:mm')}
                         </p>
-                        <p className="text-[9px] text-muted-foreground">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           {format(new Date(checkin.checkInTime), 'dd MMM')}
                         </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+                  ))
+                )}
+              </div>
+            </div>
           </Card>
 
-          <Card className="border-0 shadow-md">
-            <CardHeader className="pb-2 px-3 pt-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-                  <Sparkles className="w-3.5 h-3.5 text-white" />
+          {/* Quick Actions */}
+          <Card className="border-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm shadow-xl">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+                  <Zap className="w-6 h-6 text-white" />
                 </div>
-                <CardTitle className="text-sm">Quick Actions</CardTitle>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Quick Actions</h3>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-1.5 px-3 pb-3">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start gap-2 h-9 group hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white hover:border-transparent transition-all text-xs"
-                onClick={() => window.location.href = '/admin/members'}
-                data-testid="button-manage-members"
-              >
-                <div className="w-7 h-7 rounded-md bg-blue-500/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
-                  <Users className="w-3.5 h-3.5 text-blue-600 group-hover:text-white" />
-                </div>
-                <span className="flex-1 text-left font-medium">Manage Members</span>
-                <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </Button>
               
-              <Button 
-                variant="outline" 
-                className="w-full justify-start gap-2 h-9 group hover:bg-gradient-to-r hover:from-green-500 hover:to-emerald-600 hover:text-white hover:border-transparent transition-all text-xs"
-                onClick={() => window.location.href = '/admin/classes'}
-                data-testid="button-manage-classes"
-              >
-                <div className="w-7 h-7 rounded-md bg-green-500/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
-                  <CalendarCheck className="w-3.5 h-3.5 text-green-600 group-hover:text-white" />
-                </div>
-                <span className="flex-1 text-left font-medium">Manage Classes</span>
-                <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full justify-start gap-2 h-9 group hover:bg-gradient-to-r hover:from-purple-500 hover:to-pink-600 hover:text-white hover:border-transparent transition-all text-xs"
-                onClick={() => setShowCheckInModal(true)}
-                data-testid="button-quick-checkin"
-              >
-                <div className="w-7 h-7 rounded-md bg-purple-500/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
-                  <QrCode className="w-3.5 h-3.5 text-purple-600 group-hover:text-white" />
-                </div>
-                <span className="flex-1 text-left font-medium">Scan QR Code</span>
-                <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </Button>
-            </CardContent>
+              <div className="space-y-3">
+                {[
+                  { label: "Manage Members", icon: Users, color: "from-blue-500 to-blue-600", href: "/admin/members" },
+                  { label: "Manage Classes", icon: CalendarCheck, color: "from-green-500 to-green-600", href: "/admin/classes" },
+                  { label: "Scan QR Code", icon: QrCode, color: "from-purple-500 to-purple-600", action: () => setShowCheckInModal(true) }
+                ].map((action, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start gap-3 h-14 group border-2",
+                      "hover:border-transparent hover:shadow-lg transition-all",
+                      `hover:bg-gradient-to-r hover:${action.color} hover:text-white`
+                    )}
+                    onClick={action.action || (() => window.location.href = action.href!)}
+                    data-testid={`button-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                      `bg-gradient-to-br ${action.color} text-white shadow-md group-hover:bg-white/20`
+                    )}>
+                      <action.icon className="w-5 h-5" />
+                    </div>
+                    <span className="flex-1 text-left font-semibold">{action.label}</span>
+                    <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </Button>
+                ))}
+              </div>
+            </div>
           </Card>
         </div>
       </div>

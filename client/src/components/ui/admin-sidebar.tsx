@@ -35,6 +35,11 @@ export default function AdminSidebar({ className, isOpen, onClose }: AdminSideba
     { href: "/admin/feedback", icon: MessageSquare, label: "Feedback", color: "bg-gradient-to-br from-violet-500 to-violet-600" },
   ];
 
+  const handleNavClick = (href: string) => {
+    window.location.href = href;
+    onClose();
+  };
+
   return (
     <>
       {/* Overlay with blur effect */}
@@ -95,46 +100,45 @@ export default function AdminSidebar({ className, isOpen, onClose }: AdminSideba
             const isActive = location === item.href;
             
             return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={cn(
-                    "group relative flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 cursor-pointer",
-                    isActive 
-                      ? "bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25" 
-                      : "hover:bg-slate-100 dark:hover:bg-slate-800/50"
-                  )}
-                  data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                  onClick={onClose}
-                >
-                  {/* Icon with enhanced styling */}
-                  <div className={cn(
-                    "relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
-                    isActive 
-                      ? "bg-white/20 shadow-inner" 
-                      : `${item.color} group-hover:scale-110 shadow-md`
-                  )}>
-                    <Icon className={cn(
-                      "w-5 h-5 transition-colors",
-                      isActive ? "text-white" : "text-white"
-                    )} />
-                  </div>
-                  
-                  {/* Label with better typography */}
-                  <span className={cn(
-                    "font-semibold transition-colors text-sm tracking-wide",
-                    isActive 
-                      ? "text-white" 
-                      : "text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white"
-                  )}>
-                    {item.label}
-                  </span>
-
-                  {/* Active indicator dot */}
-                  {isActive && (
-                    <div className="absolute right-4 w-2 h-2 bg-white rounded-full animate-pulse" />
-                  )}
+              <button
+                key={item.href}
+                onClick={() => handleNavClick(item.href)}
+                className={cn(
+                  "w-full group relative flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 cursor-pointer",
+                  isActive 
+                    ? "bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25" 
+                    : "hover:bg-slate-100 dark:hover:bg-slate-800/50"
+                )}
+                data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                {/* Icon with enhanced styling */}
+                <div className={cn(
+                  "relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
+                  isActive 
+                    ? "bg-white/20 shadow-inner" 
+                    : `${item.color} group-hover:scale-110 shadow-md`
+                )}>
+                  <Icon className={cn(
+                    "w-5 h-5 transition-colors",
+                    isActive ? "text-white" : "text-white"
+                  )} />
                 </div>
-              </Link>
+                
+                {/* Label with better typography */}
+                <span className={cn(
+                  "font-semibold transition-colors text-sm tracking-wide",
+                  isActive 
+                    ? "text-white" 
+                    : "text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white"
+                )}>
+                  {item.label}
+                </span>
+
+                {/* Active indicator dot */}
+                {isActive && (
+                  <div className="absolute right-4 w-2 h-2 bg-white rounded-full animate-pulse" />
+                )}
+              </button>
             );
           })}
         </nav>
