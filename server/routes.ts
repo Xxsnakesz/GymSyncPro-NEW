@@ -312,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
-      // Create user with emailVerified = true
+      // Create user with emailVerified = true and selfie as profile image
       const user = await storage.createUser({
         username: validatedData.username,
         email: validatedData.email,
@@ -322,6 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword,
         role: 'member',
         emailVerified: true,
+        profileImageUrl: validatedData.selfieImage, // Save selfie as profile image
       });
 
       // Clear the pending verification
