@@ -14,6 +14,7 @@ import {
   oneTimeQrCodes,
   passwordResetTokens,
   notifications,
+  pushSubscriptions,
   type User,
   type UpsertUser,
   type Membership,
@@ -44,6 +45,8 @@ import {
   type InsertPasswordResetToken,
   type Notification,
   type InsertNotification,
+  type PushSubscription,
+  type InsertPushSubscription,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, lte, and, or, count, sum } from "drizzle-orm";
@@ -168,6 +171,12 @@ export interface IStorage {
   markNotificationAsRead(id: string, userId: string): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
   deleteNotification(id: string, userId: string): Promise<void>;
+  
+  // Push Subscription operations
+  getUserPushSubscriptions(userId: string): Promise<PushSubscription[]>;
+  createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
+  deletePushSubscription(endpoint: string, userId: string): Promise<void>;
+  getAllPushSubscriptions(userId: string): Promise<PushSubscription[]>;
   
   // Inactive member operations
   getInactiveMembers(daysInactive: number): Promise<(User & { membership: Membership & { plan: MembershipPlan } })[]>;
@@ -1729,6 +1738,57 @@ export class DatabaseStorage implements IStorage {
         eq(notifications.id, id),
         eq(notifications.userId, userId)
       ));
+  }
+
+  // Push Subscription operations
+  async getUserPushSubscriptions(userId: string): Promise<PushSubscription[]> {
+    const subscriptions = await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, userId));
+    
+    return subscriptions;
+  }
+
+  async createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription> {
+    const [existing] = await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await db
+        .update(pushSubscriptions)
+        .set({
+          p256dh: subscription.p256dh,
+          auth: subscription.auth,
+          userAgent: subscription.userAgent,
+        })
+        .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
+        .returning();
+      return updated;
+    }
+
+    const [newSubscription] = await db
+      .insert(pushSubscriptions)
+      .values(subscription)
+      .returning();
+    
+    return newSubscription;
+  }
+
+  async deletePushSubscription(endpoint: string, userId: string): Promise<void> {
+    await db
+      .delete(pushSubscriptions)
+      .where(and(
+        eq(pushSubscriptions.endpoint, endpoint),
+        eq(pushSubscriptions.userId, userId)
+      ));
+  }
+
+  async getAllPushSubscriptions(userId: string): Promise<PushSubscription[]> {
+    return this.getUserPushSubscriptions(userId);
   }
 
   // Inactive member operations
