@@ -148,7 +148,8 @@ export default function AdminMembers() {
     const matchesFilter = memberFilter === "all" ||
       (memberFilter === "active" && member.membership?.status === "active") ||
       (memberFilter === "expiring" && member.membership && isExpiringSoon(member.membership.endDate || "")) ||
-      (memberFilter === "expired" && member.membership?.status === "expired");
+      (memberFilter === "expired" && member.membership?.status === "expired") ||
+      (memberFilter === "inactive" && member.daysInactive !== null && member.daysInactive !== undefined && member.daysInactive >= 7);
 
     return matchesSearch && matchesFilter;
   }) || [];
@@ -242,6 +243,7 @@ export default function AdminMembers() {
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="expiring">Expiring Soon</SelectItem>
                   <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="inactive">Inactive (7+ days)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
