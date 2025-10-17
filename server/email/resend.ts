@@ -109,3 +109,69 @@ export async function sendVerificationEmail(toEmail: string, verificationCode: s
     throw error;
   }
 }
+
+export async function sendInactivityReminderEmail(toEmail: string, memberName: string, daysInactive: number) {
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+    
+    console.log(`[Resend] Attempting to send inactivity reminder email to: ${toEmail}`);
+    console.log(`[Resend] From email: ${fromEmail}`);
+    
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: toEmail,
+      subject: 'Ayo Nge-gym Lagi! 💪 - Idachi Fitness',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #EAB308; font-size: 32px; margin: 0;">💪 Idachi Fitness 💪</h1>
+          </div>
+          
+          <div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); padding: 30px; border-radius: 12px; margin-bottom: 20px;">
+            <h2 style="color: #92400E; margin-top: 0; text-align: center;">Hai ${memberName}!</h2>
+            <p style="font-size: 18px; text-align: center; color: #78350F; margin: 20px 0;">
+              <strong>Ayo nge-gym lagi! Jangan tunggu nanti — mulai hari ini! 💪</strong>
+            </p>
+          </div>
+          
+          <div style="background-color: #FFFBEB; padding: 20px; border-radius: 8px; border-left: 4px solid #EAB308;">
+            <p style="color: #92400E; margin: 0;">
+              Sudah ${daysInactive} hari kamu tidak terlihat di gym. Kami tahu hidup sibuk, tapi jangan biarkan rutinitas fitnesmu terbengkalai!
+            </p>
+          </div>
+          
+          <div style="margin: 30px 0; text-align: center;">
+            <p style="color: #78350F; font-size: 16px; margin-bottom: 20px;">
+              <strong>Ingat: Konsistensi adalah kunci kesuksesan!</strong>
+            </p>
+            <p style="color: #666;">
+              Tubuh yang kuat dimulai dari keputusan kecil setiap hari. Yuk, mulai lagi dari sekarang!
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000'}" 
+               style="background-color: #EAB308; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+              Booking Class Sekarang
+            </a>
+          </div>
+          
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5E7EB; text-align: center;">
+            <p style="color: #666; font-size: 12px; margin: 5px 0;">
+              Kami tunggu kehadiranmu di Idachi Fitness!
+            </p>
+            <p style="color: #666; font-size: 12px; margin: 5px 0;">
+              - Tim Idachi Fitness
+            </p>
+          </div>
+        </div>
+      `
+    });
+    
+    console.log(`[Resend] Inactivity reminder email sent successfully to ${toEmail}`);
+    return result;
+  } catch (error) {
+    console.error('[Resend] Error sending inactivity reminder email:', error);
+    throw error;
+  }
+}

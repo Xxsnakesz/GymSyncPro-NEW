@@ -50,6 +50,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, lte, and, or, count, sum } from "drizzle-orm";
+import { sendInactivityReminderEmail } from "./email/resend";
 
 export interface IStorage {
   // User operations
@@ -1851,6 +1852,7 @@ export class DatabaseStorage implements IStorage {
     let reminderCount = 0;
 
     for (const member of inactiveMembers) {
+      // Create in-app notification
       await this.createNotification({
         userId: member.id,
         title: 'Ayo Ngegym Lagi! 💪',
@@ -1858,6 +1860,17 @@ export class DatabaseStorage implements IStorage {
         type: 'inactivity_reminder',
         relatedId: member.membership.id,
       });
+
+      // Send email reminder
+      try {
+        const memberName = member.firstName || member.username;
+        await sendInactivityReminderEmail(member.email, memberName, daysInactive);
+        console.log(`Inactivity reminder email sent to ${member.email}`);
+      } catch (error) {
+        console.error(`Failed to send email reminder to ${member.email}:`, error);
+        // Continue with other members even if one email fails
+      }
+
       reminderCount++;
     }
 
