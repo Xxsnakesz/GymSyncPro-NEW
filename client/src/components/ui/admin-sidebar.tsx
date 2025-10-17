@@ -1,5 +1,4 @@
 import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, 
   Users, 
@@ -8,10 +7,10 @@ import {
   CreditCard, 
   QrCode, 
   MessageSquare,
-  ChevronLeft,
-  ChevronRight,
   Calendar,
-  CalendarCheck
+  CalendarCheck,
+  Menu,
+  X
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -22,70 +21,143 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ className }: AdminSidebarProps) {
   const [location] = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const menuItems = [
-    { href: "/admin", icon: LayoutDashboard, label: "Overview" },
-    { href: "/admin/members", icon: Users, label: "Members" },
-    { href: "/admin/classes", icon: Dumbbell, label: "Classes" },
-    { href: "/admin/trainers", icon: UserCog, label: "Trainers" },
-    { href: "/admin/plans", icon: CreditCard, label: "Membership Plans" },
-    { href: "/admin/pt-bookings", icon: Calendar, label: "PT Bookings" },
-    { href: "/admin/class-bookings", icon: CalendarCheck, label: "Class Bookings" },
-    { href: "/admin/checkins", icon: QrCode, label: "Check-ins" },
-    { href: "/admin/feedback", icon: MessageSquare, label: "Feedback" },
+    { href: "/admin", icon: LayoutDashboard, label: "Dashboard", color: "from-blue-500 to-cyan-500" },
+    { href: "/admin/members", icon: Users, label: "Members", color: "from-purple-500 to-pink-500" },
+    { href: "/admin/classes", icon: Dumbbell, label: "Classes", color: "from-orange-500 to-red-500" },
+    { href: "/admin/trainers", icon: UserCog, label: "Trainers", color: "from-green-500 to-emerald-500" },
+    { href: "/admin/plans", icon: CreditCard, label: "Plans", color: "from-yellow-500 to-amber-500" },
+    { href: "/admin/pt-bookings", icon: Calendar, label: "PT Bookings", color: "from-indigo-500 to-blue-500" },
+    { href: "/admin/class-bookings", icon: CalendarCheck, label: "Bookings", color: "from-teal-500 to-cyan-500" },
+    { href: "/admin/checkins", icon: QrCode, label: "Check-ins", color: "from-pink-500 to-rose-500" },
+    { href: "/admin/feedback", icon: MessageSquare, label: "Feedback", color: "from-violet-500 to-purple-500" },
   ];
 
-  return (
-    <aside 
-      className={cn(
-        "bg-card border-r border-border transition-all duration-300 flex flex-col",
-        collapsed ? "w-16" : "w-64",
-        className
-      )}
-    >
-      {/* Sidebar Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
-        {!collapsed && (
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Admin Panel</h2>
-            <p className="text-xs text-muted-foreground">Management</p>
+  const SidebarContent = () => (
+    <>
+      {/* Logo/Brand */}
+      <div className="px-6 py-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <Dumbbell className="w-6 h-6 text-white" />
           </div>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCollapsed(!collapsed)}
-          className="h-8 w-8 p-0"
-          data-testid="button-toggle-sidebar"
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </Button>
+          <div>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400">
+              Gym Admin
+            </h2>
+            <p className="text-xs text-muted-foreground">Management Panel</p>
+          </div>
+        </div>
       </div>
 
-      {/* Menu Items */}
-      <nav className="flex-1 p-3 space-y-1">
+      {/* Navigation */}
+      <nav className="flex-1 px-4 space-y-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.href;
           
           return (
             <Link key={item.href} href={item.href}>
-              <Button
-                variant={isActive ? "default" : "ghost"}
+              <div
                 className={cn(
-                  "w-full justify-start gap-3",
-                  collapsed && "justify-center px-0"
+                  "group relative flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 cursor-pointer",
+                  isActive 
+                    ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 dark:from-blue-500/20 dark:to-purple-500/20" 
+                    : "hover:bg-muted/50"
                 )}
                 data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                onClick={() => setMobileOpen(false)}
               >
-                <Icon size={18} />
-                {!collapsed && <span>{item.label}</span>}
-              </Button>
+                {/* Active indicator */}
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-r-full" />
+                )}
+                
+                {/* Icon with gradient background */}
+                <div className={cn(
+                  "w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200",
+                  isActive 
+                    ? `bg-gradient-to-br ${item.color}` 
+                    : "bg-muted group-hover:bg-gradient-to-br group-hover:" + item.color
+                )}>
+                  <Icon className={cn(
+                    "w-4.5 h-4.5 transition-colors",
+                    isActive ? "text-white" : "text-muted-foreground group-hover:text-white"
+                  )} />
+                </div>
+                
+                {/* Label */}
+                <span className={cn(
+                  "font-medium transition-colors text-sm",
+                  isActive 
+                    ? "text-foreground" 
+                    : "text-muted-foreground group-hover:text-foreground"
+                )}>
+                  {item.label}
+                </span>
+              </div>
             </Link>
           );
         })}
       </nav>
-    </aside>
+
+      {/* Bottom section */}
+      <div className="p-4 m-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 dark:from-blue-500/20 dark:to-purple-500/20 border border-blue-500/20">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <QrCode className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold text-foreground">Quick Check-in</h3>
+            <p className="text-[10px] text-muted-foreground">Scan member QR</p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile Toggle Button */}
+      <button
+        className="md:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-lg bg-card border border-border flex items-center justify-center"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        data-testid="button-toggle-sidebar-mobile"
+      >
+        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/50 z-30"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Desktop Sidebar */}
+      <aside 
+        className={cn(
+          "hidden md:flex flex-col bg-card/50 backdrop-blur-xl border-r border-border/50",
+          "w-72",
+          className
+        )}
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Sidebar */}
+      <aside 
+        className={cn(
+          "md:hidden fixed left-0 top-0 bottom-0 z-40 flex flex-col bg-card border-r border-border transition-transform duration-300",
+          "w-72",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <SidebarContent />
+      </aside>
+    </>
   );
 }
