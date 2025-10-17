@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import AdminLayout from "@/components/ui/admin-layout";
 import AdminCheckInModal from "@/components/admin-checkin-modal";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Users,
   CalendarCheck,
@@ -15,6 +16,7 @@ import {
   TrendingUp,
   Clock,
   UserPlus,
+  Bell,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -69,6 +71,28 @@ export default function AdminOverview() {
     }
   }, [isAuthenticated, isLoading, user, toast]);
 
+  const sendReminderMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/send-inactivity-reminders", {
+        daysInactive: 7
+      });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Reminder Berhasil Dikirim! ✅",
+        description: `${data.count} reminder telah dikirim ke member yang tidak aktif ${data.daysInactive} hari`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Gagal Mengirim Reminder",
+        description: error.message || "Terjadi kesalahan saat mengirim reminder",
+        variant: "destructive",
+      });
+    },
+  });
+
   const { data: dashboardData, isLoading: dashboardLoading } = useQuery<AdminDashboardResponse>({
     queryKey: ["/api/admin/dashboard"],
     enabled: isAuthenticated && user?.role === 'admin',
@@ -105,14 +129,34 @@ export default function AdminOverview() {
             <h1 className="text-3xl font-bold text-foreground">Dashboard Overview</h1>
             <p className="text-muted-foreground mt-1">Monitor your gym performance</p>
           </div>
-          <Button 
-            onClick={() => setShowCheckInModal(true)}
-            className="gym-gradient text-white"
-            data-testid="button-validate-checkin"
-          >
-            <QrCode className="mr-2" size={16} />
-            Validate Check-in
-          </Button>
+          <div className="flex gap-3">
+            <Button 
+              onClick={() => sendReminderMutation.mutate()}
+              disabled={sendReminderMutation.isPending}
+              variant="outline"
+              data-testid="button-send-reminder"
+            >
+              {sendReminderMutation.isPending ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
+                  Mengirim...
+                </>
+              ) : (
+                <>
+                  <Bell className="mr-2" size={16} />
+                  Kirim Reminder
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={() => setShowCheckInModal(true)}
+              className="gym-gradient text-white"
+              data-testid="button-validate-checkin"
+            >
+              <QrCode className="mr-2" size={16} />
+              Validate Check-in
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
