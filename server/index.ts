@@ -83,5 +83,19 @@ app.use((req, res, next) => {
     }, 60000);
     
     log("Auto-checkout job started - runs every 1 minute");
+    
+    // Inactivity reminder job - runs once every 24 hours
+    setInterval(async () => {
+      try {
+        const reminderCount = await storage.sendInactivityReminders(7);
+        if (reminderCount > 0) {
+          log(`Inactivity reminder job: ${reminderCount} reminder(s) sent to inactive members`);
+        }
+      } catch (error) {
+        console.error("Error in inactivity reminder job:", error);
+      }
+    }, 24 * 60 * 60 * 1000); // 24 hours in milliseconds
+    
+    log("Inactivity reminder job started - runs every 24 hours");
   });
 })();
