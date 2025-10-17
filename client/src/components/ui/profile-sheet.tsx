@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import PushNotificationToggle from "@/components/push-notification-toggle";
 
 interface ProfileSheetProps {
   children: React.ReactNode;
@@ -82,6 +83,13 @@ export default function ProfileSheet({ children, open, onOpenChange }: ProfileSh
             </div>
           </div>
         </SheetHeader>
+
+        <Separator className="my-4" />
+
+        {/* Push Notifications Toggle */}
+        <div className="py-2">
+          <PushNotificationToggle />
+        </div>
 
         <Separator className="my-4" />
 
