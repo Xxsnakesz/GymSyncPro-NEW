@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Camera, X, CheckCircle2, RotateCcw } from "lucide-react";
+import { Camera, X, CheckCircle2, RotateCcw, Loader2 } from "lucide-react";
 
 interface CameraSelfieProps {
   onCapture: (imageData: string) => void;
@@ -10,31 +10,68 @@ interface CameraSelfieProps {
 export default function CameraSelfie({ onCapture, capturedImage }: CameraSelfieProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const [error, setError] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const startCamera = async () => {
     try {
       setError("");
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      setIsLoading(true);
+      setIsVideoReady(false);
+
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Browser Anda tidak mendukung akses kamera");
+      }
+
+      // Request camera access with mobile-friendly constraints
+      const constraints = {
         video: {
-          facingMode: "user", // Force front-facing camera (selfie mode)
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          facingMode: "user", // Force front-facing camera
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 }
         },
         audio: false,
-      });
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
       setStream(mediaStream);
       setIsCameraActive(true);
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        
+        // Wait for video to be ready
+        videoRef.current.onloadedmetadata = () => {
+          if (videoRef.current) {
+            videoRef.current.play().then(() => {
+              setIsVideoReady(true);
+              setIsLoading(false);
+            }).catch((err) => {
+              console.error("Error playing video:", err);
+              setError("Gagal memulai video kamera");
+              setIsLoading(false);
+            });
+          }
+        };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error accessing camera:", err);
-      setError("Tidak dapat mengakses kamera. Pastikan Anda memberikan izin akses kamera.");
+      setIsLoading(false);
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError("Akses kamera ditolak. Mohon izinkan akses kamera untuk melanjutkan.");
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError("Kamera tidak ditemukan di perangkat Anda.");
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setError("Kamera sedang digunakan aplikasi lain. Tutup aplikasi tersebut dan coba lagi.");
+      } else {
+        setError(err.message || "Tidak dapat mengakses kamera. Pastikan Anda memberikan izin akses kamera.");
+      }
     }
   };
 
@@ -43,27 +80,38 @@ export default function CameraSelfie({ onCapture, capturedImage }: CameraSelfieP
       stream.getTracks().forEach((track) => track.stop());
       setStream(null);
       setIsCameraActive(false);
+      setIsVideoReady(false);
+      setIsLoading(false);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   };
 
   const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && isVideoReady) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
+      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
       const ctx = canvas.getContext("2d");
-      if (ctx) {
+      if (ctx && canvas.width > 0 && canvas.height > 0) {
         // Mirror the image horizontally for selfie effect
+        ctx.save();
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
         
-        const imageData = canvas.toDataURL("image/jpeg", 0.9);
+        // Convert to base64 with good quality
+        const imageData = canvas.toDataURL("image/jpeg", 0.85);
         onCapture(imageData);
         stopCamera();
+      } else {
+        setError("Gagal mengambil foto. Coba lagi.");
       }
     }
   };
@@ -91,11 +139,21 @@ export default function CameraSelfie({ onCapture, capturedImage }: CameraSelfieP
             <Button
               type="button"
               onClick={startCamera}
+              disabled={isLoading}
               className="bg-yellow-500 hover:bg-yellow-600 text-white"
               data-testid="button-start-camera"
             >
-              <Camera className="h-5 w-5 mr-2" />
-              Buka Kamera
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Membuka Kamera...
+                </>
+              ) : (
+                <>
+                  <Camera className="h-5 w-5 mr-2" />
+                  Buka Kamera
+                </>
+              )}
             </Button>
             {error && (
               <p className="text-red-500 text-sm mt-4">{error}</p>
@@ -105,18 +163,30 @@ export default function CameraSelfie({ onCapture, capturedImage }: CameraSelfieP
 
         {isCameraActive && !capturedImage && (
           <div className="relative">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full rounded-lg transform scale-x-[-1]"
-              style={{ maxHeight: "400px" }}
-            />
+            <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: "300px" }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover transform scale-x-[-1]"
+                style={{ maxHeight: "500px" }}
+              />
+              {!isVideoReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <div className="text-center text-white">
+                    <Loader2 className="h-12 w-12 mx-auto mb-2 animate-spin" />
+                    <p>Memuat kamera...</p>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex gap-2 justify-center mt-4">
               <Button
                 type="button"
                 onClick={capturePhoto}
-                className="bg-green-500 hover:bg-green-600 text-white"
+                disabled={!isVideoReady}
+                className="bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="button-capture-photo"
               >
                 <Camera className="h-5 w-5 mr-2" />
@@ -138,14 +208,16 @@ export default function CameraSelfie({ onCapture, capturedImage }: CameraSelfieP
 
         {capturedImage && (
           <div className="relative">
-            <img
-              src={capturedImage}
-              alt="Selfie preview"
-              className="w-full rounded-lg"
-              style={{ maxHeight: "400px", objectFit: "cover" }}
-            />
-            <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-2">
-              <CheckCircle2 className="h-6 w-6" />
+            <div className="relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+              <img
+                src={capturedImage}
+                alt="Selfie preview"
+                className="w-full h-auto object-contain"
+                style={{ maxHeight: "500px" }}
+              />
+              <div className="absolute top-3 right-3 bg-green-500 text-white rounded-full p-2 shadow-lg">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
             </div>
             <div className="flex gap-2 justify-center mt-4">
               <Button
