@@ -988,7 +988,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const members = await storage.getUsersWithMemberships();
-      res.json(members);
+      
+      // Add last check-in and activity info to each member
+      const membersWithActivity = await Promise.all(
+        members.map(async (member) => {
+          const checkIns = await storage.getUserCheckIns(member.id, 1);
+          const lastCheckIn = checkIns[0];
+          
+          let daysInactive = null;
+          if (lastCheckIn?.checkInTime) {
+            const now = new Date();
+            const lastCheckInDate = new Date(lastCheckIn.checkInTime);
+            const diffTime = now.getTime() - lastCheckInDate.getTime();
+            daysInactive = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          }
+          
+          return {
+            ...member,
+            lastCheckIn: lastCheckIn?.checkInTime || null,
+            daysInactive,
+          };
+        })
+      );
+      
+      res.json(membersWithActivity);
     } catch (error) {
       console.error("Error fetching members:", error);
       res.status(500).json({ message: "Failed to fetch members" });
