@@ -2184,6 +2184,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inactivity reminder endpoint
+  app.post('/api/admin/send-inactivity-reminders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { daysInactive = 7 } = req.body;
+      
+      const reminderCount = await storage.sendInactivityReminders(daysInactive);
+      
+      res.json({ 
+        message: `Berhasil mengirim ${reminderCount} reminder ke member yang tidak aktif`,
+        count: reminderCount,
+        daysInactive
+      });
+    } catch (error) {
+      console.error("Error sending inactivity reminders:", error);
+      res.status(500).json({ message: "Failed to send inactivity reminders" });
+    }
+  });
+
+  // Get inactive members endpoint
+  app.get('/api/admin/inactive-members', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const daysInactive = parseInt(req.query.days as string) || 7;
+      
+      const inactiveMembers = await storage.getInactiveMembers(daysInactive);
+      
+      res.json({ 
+        members: inactiveMembers,
+        count: inactiveMembers.length,
+        daysInactive
+      });
+    } catch (error) {
+      console.error("Error fetching inactive members:", error);
+      res.status(500).json({ message: "Failed to fetch inactive members" });
+    }
+  });
+
   // Indonesian Payment Gateway Routes
   
   // QRIS Payment
