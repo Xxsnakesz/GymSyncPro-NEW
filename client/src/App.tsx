@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { CookieConsentBanner } from "@/components/cookie-consent-banner";
+import { ThemeProvider } from "@/components/theme-provider";
 import Login from "@/pages/login";
 import LoginAdmin from "@/pages/login-admin";
 import Register from "@/pages/register";
@@ -98,11 +99,13 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-        <CookieConsentBanner />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+          <CookieConsentBanner />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
