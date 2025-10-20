@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import QRModal from "@/components/qr-modal";
 import FeedbackModal from "@/components/feedback-modal";
 import BottomNavigation from "@/components/ui/bottom-navigation";
-import { useTheme } from "@/components/theme-provider";
 import {
   QrCode,
   MessageSquarePlus,
@@ -22,8 +21,6 @@ import {
   Users,
   Crown,
   Zap,
-  Sun,
-  Moon,
   ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -32,7 +29,6 @@ import { cn } from "@/lib/utils";
 export default function MemberDashboard() {
   const { toast } = useToast();
   const { user, isLoading, isAuthenticated } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const [showQRModal, setShowQRModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
@@ -113,17 +109,6 @@ export default function MemberDashboard() {
                 <p className="text-sm text-muted-foreground font-medium">Ready to crush it today?</p>
               </div>
             </div>
-            <button
-              onClick={toggleTheme}
-              className="p-2.5 rounded-xl bg-muted hover:bg-muted/80 transition-all active:scale-95 border border-border shadow-sm"
-              data-testid="button-theme-toggle"
-            >
-              {theme === 'light' ? (
-                <Moon className="h-5 w-5 text-foreground" />
-              ) : (
-                <Sun className="h-5 w-5 text-yellow-500" />
-              )}
-            </button>
           </div>
 
           {/* Membership Status Banner */}

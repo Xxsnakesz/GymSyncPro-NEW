@@ -1,4 +1,4 @@
-import { LogOut, User, Settings, HelpCircle, FileText, Moon, Sun, ChevronRight } from "lucide-react";
+import { LogOut, User, Settings, HelpCircle, FileText, ChevronRight } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -13,7 +13,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import PushNotificationToggle from "@/components/push-notification-toggle";
-import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
 interface ProfileSheetProps {
@@ -24,7 +23,6 @@ interface ProfileSheetProps {
 
 export default function ProfileSheet({ children, open, onOpenChange }: ProfileSheetProps) {
   const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
 
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/logout"),
@@ -104,32 +102,6 @@ export default function ProfileSheet({ children, open, onOpenChange }: ProfileSh
             </div>
           </div>
         </SheetHeader>
-
-        {/* Theme Toggle */}
-        <div className="mt-6">
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center justify-between p-4 rounded-2xl bg-muted/50 hover:bg-muted transition-all duration-200 active:scale-98"
-            data-testid="button-theme-toggle"
-          >
-            <div className="flex items-center gap-3">
-              {theme === 'light' ? (
-                <div className="p-2 bg-yellow-500/20 rounded-xl">
-                  <Sun className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
-                </div>
-              ) : (
-                <div className="p-2 bg-blue-500/20 rounded-xl">
-                  <Moon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-              )}
-              <div>
-                <span className="font-semibold text-foreground">Appearance</span>
-                <p className="text-xs text-muted-foreground capitalize">{theme} Mode</p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
 
         <Separator className="my-6" />
 

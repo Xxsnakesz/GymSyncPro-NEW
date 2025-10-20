@@ -1,9 +1,8 @@
 import { useState } from "react";
 import AdminSidebar from "./admin-sidebar";
 import { Button } from "@/components/ui/button";
-import { Menu, Bell, LogOut, Sun, Moon, User } from "lucide-react";
+import { Menu, Bell, LogOut, User } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useTheme } from "@/components/theme-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -23,7 +22,6 @@ interface AdminLayoutProps {
 export default function AdminLayout({ user, notificationCount = 0, children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -79,21 +77,6 @@ export default function AdminLayout({ user, notificationCount = 0, children }: A
           
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">
-            {/* Theme Toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="relative rounded-lg hover:bg-muted transition-all duration-200 hover:scale-105 active:scale-95"
-              data-testid="button-theme-toggle"
-            >
-              {theme === 'light' ? (
-                <Moon className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
-              ) : (
-                <Sun className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
-              )}
-            </Button>
-
             {/* Notifications */}
             <Button
               variant="ghost"
