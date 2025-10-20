@@ -98,7 +98,9 @@
   }
 
   .sidebar-item-active {
-    @apply text-primary bg-primary/10 shadow-sm shadow-primary/20;
+    @apply text-primary shadow-sm;
+    background-color: hsl(var(--primary) / 0.1);
+    box-shadow: 0 1px 2px 0 hsl(var(--primary) / 0.2);
   }
 
   .sidebar-item-inactive {
@@ -207,7 +209,8 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-muted-foreground/50;
+  @apply bg-muted-foreground rounded-full;
+  opacity: 0.5;
 }
 
 /* Loading spinner */
@@ -217,7 +220,8 @@
 
 /* Selection color */
 ::selection {
-  @apply bg-primary/30 text-foreground;
+  @apply text-foreground;
+  background-color: hsl(var(--primary) / 0.3);
 }
 
 /* Focus visible for accessibility */
