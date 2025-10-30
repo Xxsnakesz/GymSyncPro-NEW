@@ -1,0 +1,36 @@
+"Saya ingin kamu redesign halaman 'Check-In' di dashboard admin sistem manajemen gym bernama 'Idachi Fitness'. Tujuannya adalah membuatnya lebih profesional, modern, dan intuitif. Berikut detail spesifikasinya: 
+
+🚫 HAPUS FITUR LAMA
+Hilangkan tombol hijau “Scan QR Code” di kanan atas.
+Jangan tampilkan fitur scan QR sama sekali — ganti dengan sistem otomatis.
+📸 FITUR BARU: AUTO CAMERA ON
+Saat pengguna membuka halaman Check-In, secara otomatis aktifkan kamera webcam (jika di desktop) atau kamera ponsel (jika di mobile).
+Kamera akan menampilkan preview real-time dalam area persegi panjang di tengah layar.
+Di atas kamera, tampilkan teks:
+“Arahkan wajah member ke kamera untuk check-in otomatis” 
+Di bawah kamera, tambahkan tombol “Gunakan Kamera Manual” jika auto-camera tidak bisa diaktifkan.
+🧭 DESAIN HALAMAN CHECK-IN (UI MODERN)
+Gunakan tema gelap (dark mode) dengan warna dominan: #0F172A (background), #1E293B (card), dan aksen hijau (#10B981) untuk tombol sukses.
+Header halaman tetap:
+“Check-ins” + subtitle: “Monitor member check-in activity” 
+Statistik tetap ditampilkan di atas (Today’s Check-ins, Total Check-ins, Active Members) — tapi gunakan card design yang lebih rapi dan berbayang (elevated cards).
+💥 POP-UP NOTIFIKASI CHECK-IN BERHASIL
+Ketika sistem mendeteksi wajah member dan berhasil check-in:
+Muncul pop-up modal berbentuk persegi panjang vertikal (lebar 400px, tinggi 500px) di tengah layar.
+Pop-up memiliki background semi-transparan gelap (rgba(0,0,0,0.8)) dan border radius 16px.
+Isi pop-up:
+Foto profil member (dari database) — ukuran besar, bulat (avatar circle).
+Nama member (font bold, size 20px).
+Tipe membership (misal: “Gold Mahasiswa”) — badge kecil berwarna hijau/biru.
+Waktu check-in: “✅ Checked in at 19:58 | 19 Oct 2025”
+Tombol “Close” di pojok kanan atas — bentuk X putih dalam lingkaran transparan.
+Animasi muncul: fade-in + slide-up dari bawah.
+🎨 DETAIL DESAIN TAMBAHAN
+Semua tombol dan elemen harus memiliki hover effect dan shadow.
+Gunakan ikon modern (misal: dari Lucide Icons atau Heroicons).
+Tambahkan loading spinner saat kamera sedang memproses deteksi wajah.
+Jika gagal deteksi wajah, tampilkan pesan:
+“Wajah tidak terdeteksi. Silakan coba lagi atau gunakan manual check-in.” 
+🖥️ RESPONSIVE & CROSS-PLATFORM
+Desain harus responsif — bekerja baik di desktop maupun tablet/mobile.
+Di mobile, kamera harus mengisi full width dan ada tombol “Ambil Foto” jika otomatis tidak bekerja.
