@@ -14,6 +14,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import PushNotificationToggle from "@/components/push-notification-toggle";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProfileSheetProps {
   children: React.ReactNode;
@@ -23,6 +24,7 @@ interface ProfileSheetProps {
 
 export default function ProfileSheet({ children, open, onOpenChange }: ProfileSheetProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/logout"),
@@ -31,32 +33,67 @@ export default function ProfileSheet({ children, open, onOpenChange }: ProfileSh
     },
   });
 
+  const handleMenuClick = (action: string) => {
+    switch (action) {
+      case "profile":
+        toast({
+          title: "My Profile",
+          description: "Profile page coming soon!",
+        });
+        setTimeout(() => onOpenChange?.(false), 300);
+        break;
+      case "settings":
+        toast({
+          title: "Settings",
+          description: "Settings page coming soon!",
+        });
+        setTimeout(() => onOpenChange?.(false), 300);
+        break;
+      case "terms":
+        toast({
+          title: "Terms & Conditions",
+          description: "Please contact admin for terms and conditions information.",
+        });
+        setTimeout(() => onOpenChange?.(false), 300);
+        break;
+      case "help":
+        toast({
+          title: "Help & Support",
+          description: "Need help? Contact us at support@idachifitness.com",
+        });
+        setTimeout(() => onOpenChange?.(false), 300);
+        break;
+      default:
+        break;
+    }
+  };
+
   const menuItems = [
     {
       icon: User,
       label: "My Profile",
-      href: "#",
+      action: "profile",
       testId: "menu-profile",
       color: "text-neon-green"
     },
     {
       icon: Settings,
       label: "Settings",
-      href: "#",
+      action: "settings",
       testId: "menu-settings",
       color: "text-muted-foreground"
     },
     {
       icon: FileText,
       label: "Terms & Conditions",
-      href: "#",
+      action: "terms",
       testId: "menu-terms",
       color: "text-muted-foreground"
     },
     {
       icon: HelpCircle,
       label: "Help & Support",
-      href: "#",
+      action: "help",
       testId: "menu-help",
       color: "text-muted-foreground"
     }
@@ -120,6 +157,7 @@ export default function ProfileSheet({ children, open, onOpenChange }: ProfileSh
               <Button
                 key={item.testId}
                 variant="ghost"
+                onClick={() => handleMenuClick(item.action)}
                 className={cn(
                   "w-full justify-between h-14 rounded-2xl hover:bg-muted/50 transition-all duration-200 active:scale-98",
                   "group"
