@@ -22,7 +22,7 @@ The application features modern, responsive design with:
 - **Responsive Design**: Mobile-first approach with adaptive layouts that progressively enhance for larger screens, ensuring optimal UX across all devices.
 
 ### Backend Architecture
-The server uses Express.js with TypeScript in an ESM environment. The API follows RESTful patterns with route-based organization. Authentication is implemented using OpenID Connect (OIDC) with Replit's authentication service, utilizing Passport.js for session management. Session storage is handled by connect-pg-simple with PostgreSQL backing.
+The server uses Express.js with TypeScript in an ESM environment. The API follows RESTful patterns with route-based organization. Authentication is implemented using Passport.js with local strategy (email/username/phone + password), supporting secure password hashing with bcryptjs. Session storage is handled by connect-pg-simple with PostgreSQL backing.
 
 ### Database Design
 Data persistence uses PostgreSQL with Drizzle ORM for type-safe database operations. The schema includes comprehensive entities for users, memberships, membership plans, gym classes, class bookings, check-ins, and payments. Relations are properly defined between entities, and the system supports both session storage and application data in the same database.
@@ -35,7 +35,7 @@ The system supports multiple payment gateways:
 Both payment systems are designed as optional modules that can be configured based on deployment requirements.
 
 ### Authentication & Authorization
-Authentication uses OpenID Connect integration with Replit's identity provider. The system implements role-based access control with "member" and "admin" roles. Session management includes secure cookie handling and automatic session cleanup. Unauthorized access triggers automatic re-authentication flows.
+Authentication uses Passport.js local strategy supporting login with email, username, or phone number. Passwords are securely hashed using bcryptjs. The system implements role-based access control with "member" and "admin" roles. Email verification is required for new members (admin accounts bypass verification). Session management includes secure cookie handling (HTTPS-only in production) and automatic session cleanup via PostgreSQL. Unauthorized access returns 401/403 status codes.
 
 ### File Organization
 The codebase follows a monorepo structure with clear separation:
@@ -60,9 +60,9 @@ The system automatically tracks member activity and sends reminders to inactive 
 ## External Dependencies
 
 ### Core Infrastructure
-- **Neon Database**: PostgreSQL hosting with connection pooling via @neondatabase/serverless
-- **Replit Authentication**: OpenID Connect provider for user authentication
-- **Replit Development Tools**: Hot reloading, error overlays, and development utilities
+- **PostgreSQL Database**: Any PostgreSQL hosting (Neon, Supabase, self-hosted) with connection pooling via @neondatabase/serverless
+- **Session Store**: PostgreSQL-backed sessions using connect-pg-simple
+- **Development Tools**: Vite for hot reloading, TypeScript for type safety, and ESLint for code quality
 
 ### Payment Providers
 - **Stripe**: International payment processing with webhook support
@@ -81,8 +81,9 @@ The system automatically tracks member activity and sends reminders to inactive 
 - **TanStack React Query**: Server state management and caching
 
 ### Email Service
-- **Resend**: Transactional email service for password reset and notifications
-  - **Configuration Required**: Domain verification needed at https://resend.com/domains
-  - **Current Issue**: The configured sender domain (gmail.com) is not verified, causing email delivery failures
-  - **Impact**: Password reset emails are not being delivered to users
-  - **Solution**: Verify a custom domain in Resend or use Resend's default sender domain
+- **Resend**: Transactional email service for password reset, email verification, and member inactivity notifications
+  - **Configuration Required**: 
+    - Set `RESEND_API_KEY` environment variable (get from https://resend.com/api-keys)
+    - Set `RESEND_FROM_EMAIL` environment variable (e.g., "noreply@yourdomain.com")
+    - Verify your sending domain at https://resend.com/domains for production use
+  - **Default**: Falls back to "onboarding@resend.dev" if RESEND_FROM_EMAIL is not set (development only)
