@@ -1,4 +1,4 @@
-import { CookiePreferences, CookieSettings } from "@shared/schema";
+import { CookiePreferences, CookieSettings } from "@shared/schema.ts";
 
 export const COOKIE_NAMES = {
   CONSENT: 'cookie_consent',

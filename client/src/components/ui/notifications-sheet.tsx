@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Bell, Check, Trash2, CheckCheck } from "lucide-react";
 import { format } from "date-fns";
-import type { Notification } from "@shared/schema";
+import type { Notification } from "@shared/schema.ts";
 
 interface NotificationsSheetProps {
   children: React.ReactNode;

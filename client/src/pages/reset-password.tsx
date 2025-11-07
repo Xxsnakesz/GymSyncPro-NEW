@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { resetPasswordSchema, type ResetPasswordInput } from "@shared/schema";
+import { resetPasswordSchema, type ResetPasswordInput } from "@shared/schema.ts";
 import { Dumbbell, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";

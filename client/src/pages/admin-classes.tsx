@@ -9,7 +9,8 @@ import AdminLayout from "@/components/ui/admin-layout";
 import AdminClassDialog from "@/components/admin-class-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Edit, Trash2, Users, Calendar } from "lucide-react";
-import type { GymClass } from "@shared/schema";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import type { GymClass } from "@shared/schema.ts";
 
 export default function AdminClasses() {
   const { toast } = useToast();
@@ -118,7 +119,12 @@ export default function AdminClasses() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {gymClasses.map((gymClass) => (
-              <Card key={gymClass.id} className="hover:shadow-lg transition-shadow">
+              <Card key={gymClass.id} className="hover:shadow-lg transition-shadow overflow-hidden">
+                {(gymClass as any).imageUrl && (
+                  <AspectRatio ratio={16/9}>
+                    <img src={(gymClass as any).imageUrl} alt={gymClass.name} className="w-full h-full object-cover" />
+                  </AspectRatio>
+                )}
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">

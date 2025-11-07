@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { MembershipPlan } from "@shared/schema";
+import type { MembershipPlan } from "@shared/schema.ts";
 
 const editMemberSchema = z.object({
   firstName: z.string().min(1, "Nama depan diperlukan"),

@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { QrCode, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
@@ -27,6 +28,8 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
   const [checkInSuccess, setCheckInSuccess] = useState(false);
   const [checkInData, setCheckInData] = useState<any>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Ensure we only auto-refresh once per code lifecycle to avoid loops
+  const hasAutoRefreshedRef = useRef(false);
 
   const generateNewQRMutation = useMutation({
     mutationFn: async () => {
@@ -104,7 +107,7 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
     // Initial calculation
     setTimeRemaining(calculateTimeRemaining());
 
-    // Track if refresh is already in progress
+    // Track if refresh is already in progress within this interval
     let refreshInProgress = false;
 
     // Update every second
@@ -112,16 +115,35 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
       const remaining = calculateTimeRemaining();
       setTimeRemaining(remaining);
 
-      // Auto-refresh QR 30 seconds before expiry (or when expired)
-      // Only trigger once and avoid flood of requests
-      if (remaining <= 30 && !refreshInProgress && !generateNewQRMutation.isPending) {
+      // Auto-refresh QR shortly before expiry, but only once per lifecycle
+      // This avoids repeated refresh loops if server returns near-expired timestamps
+      if (
+        remaining <= 30 &&
+        remaining >= 0 &&
+        !refreshInProgress &&
+        !generateNewQRMutation.isPending &&
+        !hasAutoRefreshedRef.current
+      ) {
         refreshInProgress = true;
+        hasAutoRefreshedRef.current = true;
         generateNewQRMutation.mutate();
       }
     }, 1000);
 
     return () => clearInterval(interval);
   }, [currentQRData?.expiresAt, generateNewQRMutation]);
+
+  // When we receive a brand new QR (expiresAt or qrCode changes),
+  // reset the auto-refresh flag if there is ample time remaining (> 90s)
+  useEffect(() => {
+    if (!currentQRData?.expiresAt) return;
+    const now = new Date().getTime();
+    const expires = new Date(currentQRData.expiresAt).getTime();
+    const remaining = Math.max(0, Math.floor((expires - now) / 1000));
+    if (remaining > 90) {
+      hasAutoRefreshedRef.current = false;
+    }
+  }, [currentQRData?.expiresAt, currentQRData?.qrCode]);
 
   // Poll QR code status to detect when admin scans it
   useEffect(() => {
@@ -167,6 +189,9 @@ export default function QRModal({ isOpen, onClose, qrData }: QRModalProps) {
       <DialogContent className="sm:max-w-md" data-testid="modal-qr-code">
         <DialogHeader>
           <DialogTitle className="text-center">Check-in QR Code</DialogTitle>
+          <DialogDescription className="text-center">
+            Tunjukkan QR ini ke admin untuk melakukan check-in. QR berlaku 5 menit.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="flex flex-col items-center space-y-6 p-6">

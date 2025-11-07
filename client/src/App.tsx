@@ -5,34 +5,39 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { CookieConsentBanner } from "@/components/cookie-consent-banner";
-import { useEffect } from "react";
-import Login from "@/pages/login";
-import LoginAdmin from "@/pages/login-admin";
-import Register from "@/pages/register";
-import RegisterAdmin from "@/pages/register-admin";
-import ForgotPassword from "@/pages/forgot-password";
-import ResetPassword from "@/pages/reset-password";
-import VerifyEmail from "@/pages/verify-email";
-import MemberDashboard from "@/pages/member-dashboard";
-import AdminOverview from "@/pages/admin-overview";
-import AdminMembers from "@/pages/admin-members";
-import AdminClasses from "@/pages/admin-classes";
-import AdminTrainers from "@/pages/admin-trainers";
-import AdminPlans from "@/pages/admin-plans";
-import AdminCheckIns from "@/pages/admin-checkins";
-import AdminFeedback from "@/pages/admin-feedback";
-import AdminPTBookings from "@/pages/admin-pt-bookings";
-import AdminPTSessions from "@/pages/admin-pt-sessions";
-import AdminClassBookings from "@/pages/admin-class-bookings";
-import Checkout from "@/pages/checkout";
-import MyBookings from "@/pages/my-bookings";
-import MyPtSessions from "@/pages/my-pt-sessions";
-import CheckInVerify from "@/pages/checkin-verify";
-import CookieSettings from "@/pages/cookie-settings";
-import MyProfile from "@/pages/my-profile";
-import Settings from "@/pages/settings";
-import Terms from "@/pages/terms";
-import NotFound from "@/pages/not-found";
+import { useEffect, lazy, Suspense } from "react";
+const Login = lazy(() => import("@/pages/login"));
+const LoginAdmin = lazy(() => import("@/pages/login-admin"));
+const Register = lazy(() => import("@/pages/register"));
+const RegisterAdmin = lazy(() => import("@/pages/register-admin"));
+const ForgotPassword = lazy(() => import("@/pages/forgot-password"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
+const VerifyEmail = lazy(() => import("@/pages/verify-email"));
+const MemberDashboard = lazy(() => import("@/pages/member-dashboard"));
+const AdminOverview = lazy(() => import("@/pages/admin-overview"));
+const AdminMembers = lazy(() => import("@/pages/admin-members"));
+const AdminClasses = lazy(() => import("@/pages/admin-classes"));
+const AdminTrainers = lazy(() => import("@/pages/admin-trainers"));
+const AdminPlans = lazy(() => import("@/pages/admin-plans"));
+const AdminCheckIns = lazy(() => import("@/pages/admin-checkins"));
+const AdminFeedback = lazy(() => import("@/pages/admin-feedback"));
+const AdminPTBookings = lazy(() => import("@/pages/admin-pt-bookings"));
+const AdminPTSessions = lazy(() => import("@/pages/admin-pt-sessions"));
+const AdminPromotions = lazy(() => import("@/pages/admin-promotions"));
+const AdminClassBookings = lazy(() => import("@/pages/admin-class-bookings"));
+const Checkout = lazy(() => import("@/pages/checkout"));
+const MyBookings = lazy(() => import("@/pages/my-bookings"));
+const MyPtSessions = lazy(() => import("@/pages/my-pt-sessions"));
+const ClassesPage = lazy(() => import("@/pages/classes"));
+const BookPTPage = lazy(() => import("@/pages/book-pt"));
+const CheckInVerify = lazy(() => import("@/pages/checkin-verify"));
+const CookieSettings = lazy(() => import("@/pages/cookie-settings"));
+const MyProfile = lazy(() => import("@/pages/my-profile"));
+const PromotionsPage = lazy(() => import("@/pages/promotions"));
+const Settings = lazy(() => import("@/pages/settings"));
+const Terms = lazy(() => import("@/pages/terms"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Landing = lazy(() => import("@/pages/landing"));
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -60,9 +65,9 @@ function Router() {
           <Route path="/login-admin" component={LoginAdmin} />
           <Route path="/register" component={Register} />
           <Route path="/register-admin" component={RegisterAdmin} />
-          <Route path="/">
-            <Redirect to="/login" />
-          </Route>
+          {/* Move marketing landing to /welcome so default / goes to Login */}
+          <Route path="/welcome" component={Landing} />
+          <Route path="/" component={Login} />
         </>
       ) : (
         <>
@@ -76,11 +81,15 @@ function Router() {
           <Route path="/admin/feedback" component={AdminFeedback} />
           <Route path="/admin/pt-bookings" component={AdminPTBookings} />
           <Route path="/admin/pt-sessions" component={AdminPTSessions} />
+          <Route path="/admin/promotions" component={AdminPromotions} />
           <Route path="/admin/class-bookings" component={AdminClassBookings} />
           <Route path="/checkout" component={Checkout} />
+          <Route path="/classes" component={ClassesPage} />
+          <Route path="/book-pt" component={BookPTPage} />
           <Route path="/my-bookings" component={MyBookings} />
           <Route path="/my-pt-sessions" component={MyPtSessions} />
           <Route path="/my-profile" component={MyProfile} />
+          <Route path="/promotions" component={PromotionsPage} />
           <Route path="/settings" component={Settings} />
           <Route path="/terms" component={Terms} />
           <Route path="/login">
@@ -111,7 +120,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+        }>
+          <Router />
+        </Suspense>
         <CookieConsentBanner />
       </TooltipProvider>
     </QueryClientProvider>

@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Calendar,
   CalendarCheck,
+  Megaphone,
   X,
   HelpCircle,
   ChevronLeft,
@@ -44,6 +45,7 @@ export default function AdminSidebar({
     { href: "/admin/pt-bookings", icon: Calendar, label: "PT Bookings" },
     { href: "/admin/class-bookings", icon: CalendarCheck, label: "Bookings" },
     { href: "/admin/checkins", icon: QrCode, label: "Check-In" },
+    { href: "/admin/promotions", icon: Megaphone, label: "Promotions" },
     { href: "/admin/feedback", icon: MessageSquare, label: "Feedback" },
   ];
 

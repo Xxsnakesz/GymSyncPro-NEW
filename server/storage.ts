@@ -15,6 +15,7 @@ import {
   passwordResetTokens,
   notifications,
   pushSubscriptions,
+  promotions,
   type User,
   type UpsertUser,
   type Membership,
@@ -47,10 +48,13 @@ import {
   type InsertNotification,
   type PushSubscription,
   type InsertPushSubscription,
+  type Promotion,
+  type InsertPromotion,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, gte, lte, and, or, count, sum } from "drizzle-orm";
+import { eq, desc, gte, lte, and, or, count, sum, sql } from "drizzle-orm";
 import { sendInactivityReminderEmail } from "./email/resend";
+import { randomUUID } from 'crypto';
 
 export interface IStorage {
   // User operations
@@ -182,6 +186,13 @@ export interface IStorage {
   // Inactive member operations
   getInactiveMembers(daysInactive: number): Promise<(User & { membership: Membership & { plan: MembershipPlan } })[]>;
   sendInactivityReminders(daysInactive: number): Promise<number>;
+
+  // Promotions operations
+  getAllPromotions(): Promise<Promotion[]>;
+  getActivePromotions(): Promise<Promotion[]>;
+  createPromotion(promo: InsertPromotion): Promise<Promotion>;
+  updatePromotion(id: string, promo: Partial<InsertPromotion>): Promise<void>;
+  deletePromotion(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -288,9 +299,8 @@ export class DatabaseStorage implements IStorage {
       return user.permanentQrCode;
     }
     
-    // Generate a new permanent QR code
-    const { randomUUID } = await import('crypto');
-    const qrCode = randomUUID();
+  // Generate a new permanent QR code
+  const qrCode = randomUUID();
     
     // Update user with new permanent QR code
     await db
@@ -401,16 +411,55 @@ export class DatabaseStorage implements IStorage {
 
   // Class operations
   async getGymClasses(): Promise<GymClass[]> {
-    return await db.select().from(gymClasses).where(eq(gymClasses.active, true));
+    try {
+      return await db.select().from(gymClasses).where(eq(gymClasses.active, true));
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      const missingImageUrl = msg.includes('gym_classes.image_url') || msg.includes('column') && msg.includes('image_url');
+      if (!missingImageUrl) throw e;
+      const rows = await db
+        .select({
+          id: gymClasses.id,
+          name: gymClasses.name,
+          description: gymClasses.description,
+          instructorName: gymClasses.instructorName,
+          schedule: gymClasses.schedule,
+          maxCapacity: gymClasses.maxCapacity,
+          currentEnrollment: gymClasses.currentEnrollment,
+          active: gymClasses.active,
+          createdAt: gymClasses.createdAt,
+          imageUrl: sql<string | null>`NULL`.as('image_url'),
+        })
+        .from(gymClasses)
+        .where(eq(gymClasses.active, true));
+      return rows as unknown as GymClass[];
+    }
   }
 
   async createGymClass(gymClass: InsertGymClass): Promise<GymClass> {
-    const [newClass] = await db.insert(gymClasses).values(gymClass).returning();
-    return newClass;
+    try {
+      const [newClass] = await db.insert(gymClasses).values(gymClass).returning();
+      return newClass;
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      const missingImageUrl = msg.includes('gym_classes.image_url') || msg.includes('column') && msg.includes('image_url');
+      if (!missingImageUrl) throw e;
+      const { imageUrl, ...rest } = gymClass as any;
+      const [newClass] = await db.insert(gymClasses).values(rest).returning();
+      return newClass as GymClass;
+    }
   }
 
   async updateGymClass(id: string, gymClass: Partial<InsertGymClass>): Promise<void> {
-    await db.update(gymClasses).set(gymClass).where(eq(gymClasses.id, id));
+    try {
+      await db.update(gymClasses).set(gymClass).where(eq(gymClasses.id, id));
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      const missingImageUrl = msg.includes('gym_classes.image_url') || msg.includes('column') && msg.includes('image_url');
+      if (!missingImageUrl) throw e;
+      const { imageUrl, ...rest } = gymClass as any;
+      await db.update(gymClasses).set(rest).where(eq(gymClasses.id, id));
+    }
   }
 
   async deleteGymClass(id: string): Promise<void> {
@@ -418,38 +467,105 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserClassBookings(userId: string): Promise<(ClassBooking & { gymClass: GymClass })[]> {
-    return await db
-      .select({
-        id: classBookings.id,
-        userId: classBookings.userId,
-        classId: classBookings.classId,
-        bookingDate: classBookings.bookingDate,
-        status: classBookings.status,
-        createdAt: classBookings.createdAt,
-        gymClass: gymClasses,
-      })
-      .from(classBookings)
-      .innerJoin(gymClasses, eq(classBookings.classId, gymClasses.id))
-      .where(eq(classBookings.userId, userId))
-      .orderBy(desc(classBookings.bookingDate));
+    try {
+      return await db
+        .select({
+          id: classBookings.id,
+          userId: classBookings.userId,
+          classId: classBookings.classId,
+          bookingDate: classBookings.bookingDate,
+          status: classBookings.status,
+          createdAt: classBookings.createdAt,
+          gymClass: gymClasses,
+        })
+        .from(classBookings)
+        .innerJoin(gymClasses, eq(classBookings.classId, gymClasses.id))
+        .where(eq(classBookings.userId, userId))
+        .orderBy(desc(classBookings.bookingDate));
+    } catch (e: any) {
+      // Fallback for legacy DBs missing gym_classes.image_url column
+      const msg = String(e?.message || e);
+      const missingImageUrl = msg.includes('gym_classes.image_url') || msg.includes('column') && msg.includes('image_url');
+      if (!missingImageUrl) throw e;
+      const rows = await db
+        .select({
+          id: classBookings.id,
+          userId: classBookings.userId,
+          classId: classBookings.classId,
+          bookingDate: classBookings.bookingDate,
+          status: classBookings.status,
+          createdAt: classBookings.createdAt,
+          gymClass: {
+            id: gymClasses.id,
+            name: gymClasses.name,
+            description: gymClasses.description,
+            instructorName: gymClasses.instructorName,
+            schedule: gymClasses.schedule,
+            maxCapacity: gymClasses.maxCapacity,
+            currentEnrollment: gymClasses.currentEnrollment,
+            active: gymClasses.active,
+            createdAt: gymClasses.createdAt,
+            // Provide NULL literal to avoid referencing a non-existent column
+            imageUrl: sql<string | null>`NULL`.as('image_url'),
+          },
+        })
+        .from(classBookings)
+        .innerJoin(gymClasses, eq(classBookings.classId, gymClasses.id))
+        .where(eq(classBookings.userId, userId))
+        .orderBy(desc(classBookings.bookingDate));
+      return rows as unknown as (ClassBooking & { gymClass: GymClass })[];
+    }
   }
 
   async getAllClassBookings(): Promise<(ClassBooking & { user: User; gymClass: GymClass })[]> {
-    return await db
-      .select({
-        id: classBookings.id,
-        userId: classBookings.userId,
-        classId: classBookings.classId,
-        bookingDate: classBookings.bookingDate,
-        status: classBookings.status,
-        createdAt: classBookings.createdAt,
-        user: users,
-        gymClass: gymClasses,
-      })
-      .from(classBookings)
-      .innerJoin(users, eq(classBookings.userId, users.id))
-      .innerJoin(gymClasses, eq(classBookings.classId, gymClasses.id))
-      .orderBy(desc(classBookings.bookingDate));
+    try {
+      return await db
+        .select({
+          id: classBookings.id,
+          userId: classBookings.userId,
+          classId: classBookings.classId,
+          bookingDate: classBookings.bookingDate,
+          status: classBookings.status,
+          createdAt: classBookings.createdAt,
+          user: users,
+          gymClass: gymClasses,
+        })
+        .from(classBookings)
+        .innerJoin(users, eq(classBookings.userId, users.id))
+        .innerJoin(gymClasses, eq(classBookings.classId, gymClasses.id))
+        .orderBy(desc(classBookings.bookingDate));
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      const missingImageUrl = msg.includes('gym_classes.image_url') || msg.includes('column') && msg.includes('image_url');
+      if (!missingImageUrl) throw e;
+      const rows = await db
+        .select({
+          id: classBookings.id,
+          userId: classBookings.userId,
+          classId: classBookings.classId,
+          bookingDate: classBookings.bookingDate,
+          status: classBookings.status,
+          createdAt: classBookings.createdAt,
+          user: users,
+          gymClass: {
+            id: gymClasses.id,
+            name: gymClasses.name,
+            description: gymClasses.description,
+            instructorName: gymClasses.instructorName,
+            schedule: gymClasses.schedule,
+            maxCapacity: gymClasses.maxCapacity,
+            currentEnrollment: gymClasses.currentEnrollment,
+            active: gymClasses.active,
+            createdAt: gymClasses.createdAt,
+            imageUrl: sql<string | null>`NULL`.as('image_url'),
+          },
+        })
+        .from(classBookings)
+        .innerJoin(users, eq(classBookings.userId, users.id))
+        .innerJoin(gymClasses, eq(classBookings.classId, gymClasses.id))
+        .orderBy(desc(classBookings.bookingDate));
+      return rows as unknown as (ClassBooking & { user: User; gymClass: GymClass })[];
+    }
   }
 
   async bookClass(booking: InsertClassBooking): Promise<ClassBooking> {
@@ -549,6 +665,7 @@ export class DatabaseStorage implements IStorage {
         checkInTime: checkIns.checkInTime,
         checkOutTime: checkIns.checkOutTime,
         qrCode: checkIns.qrCode,
+        lockerNumber: checkIns.lockerNumber,
         status: checkIns.status,
         createdAt: checkIns.createdAt,
         user: users,
@@ -586,6 +703,7 @@ export class DatabaseStorage implements IStorage {
       checkInTime: row.checkInTime,
       checkOutTime: row.checkOutTime,
       qrCode: row.qrCode,
+      lockerNumber: row.lockerNumber,
       status: row.status,
       createdAt: row.createdAt,
       user: row.user,
@@ -641,9 +759,8 @@ export class DatabaseStorage implements IStorage {
       // User already has an active check-in
       checkIn = existingCheckIn[0];
     } else {
-      // Create new check-in
-      const { randomUUID } = await import('crypto');
-      const newCheckInQr = randomUUID();
+  // Create new check-in
+  const newCheckInQr = randomUUID();
       const [newCheckIn] = await db
         .insert(checkIns)
         .values({
@@ -673,6 +790,7 @@ export class DatabaseStorage implements IStorage {
         checkInTime: checkIns.checkInTime,
         checkOutTime: checkIns.checkOutTime,
         qrCode: checkIns.qrCode,
+        lockerNumber: checkIns.lockerNumber,
         status: checkIns.status,
         createdAt: checkIns.createdAt,
         user: users,
@@ -701,12 +819,13 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(checkIns.checkInTime))
       .limit(limit);
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       userId: row.userId,
       checkInTime: row.checkInTime,
       checkOutTime: row.checkOutTime,
       qrCode: row.qrCode,
+    lockerNumber: row.lockerNumber,
       status: row.status,
       createdAt: row.createdAt,
       user: row.user,
@@ -841,7 +960,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(memberships, and(eq(users.id, memberships.userId), eq(memberships.status, "active")))
       .leftJoin(membershipPlans, eq(memberships.planId, membershipPlans.id));
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       username: row.username,
       password: '', // Never expose password hashes
@@ -979,7 +1098,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(feedbacks.userId, users.id))
       .orderBy(desc(feedbacks.createdAt));
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       userId: row.userId,
       subject: row.subject,
@@ -1058,7 +1177,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(ptBookings.userId, userId))
       .orderBy(desc(ptBookings.bookingDate));
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       userId: row.userId,
       trainerId: row.trainerId,
@@ -1094,7 +1213,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(personalTrainers, eq(ptBookings.trainerId, personalTrainers.id))
       .orderBy(desc(ptBookings.bookingDate));
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       userId: row.userId,
       trainerId: row.trainerId,
@@ -1205,7 +1324,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(ptSessionPackages.userId, userId))
       .orderBy(desc(ptSessionPackages.createdAt));
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       userId: row.userId,
       trainerId: row.trainerId,
@@ -1311,7 +1430,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(ptSessionAttendance.packageId, packageId))
       .orderBy(desc(ptSessionAttendance.sessionNumber));
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       packageId: row.packageId,
       userId: row.userId,
@@ -1358,7 +1477,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(ptSessionAttendance.userId, userId))
       .orderBy(desc(ptSessionAttendance.sessionDate));
 
-    return result.map(row => ({
+  return result.map((row: any) => ({
       id: row.id,
       packageId: row.packageId,
       userId: row.userId,
@@ -1458,22 +1577,26 @@ export class DatabaseStorage implements IStorage {
 
   // One-time QR code operations
   async generateOneTimeQrCode(userId: string): Promise<OneTimeQrCode> {
-    const { randomUUID } = await import('crypto');
-    const qrCode = randomUUID();
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes from now
+    try {
+  const qrCode = randomUUID();
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes from now
 
-    const [newQrCode] = await db
-      .insert(oneTimeQrCodes)
-      .values({
-        userId,
-        qrCode,
-        expiresAt,
-        status: 'valid',
-      })
-      .returning();
-    
-    return newQrCode;
+      const [newQrCode] = await db
+        .insert(oneTimeQrCodes)
+        .values({
+          userId,
+          qrCode,
+          expiresAt,
+          status: 'valid',
+        })
+        .returning();
+
+      return newQrCode;
+    } catch (error: any) {
+      console.error(`generateOneTimeQrCode failed for user ${userId}:`, error?.stack || error);
+      throw new Error(error?.message || 'Failed to generate one-time QR code');
+    }
   }
 
   async validateOneTimeQrCode(qrCode: string): Promise<(OneTimeQrCode & { user: User; membership?: Membership & { plan: MembershipPlan } }) | undefined> {
@@ -1800,6 +1923,35 @@ export class DatabaseStorage implements IStorage {
 
   async getAllPushSubscriptions(userId: string): Promise<PushSubscription[]> {
     return this.getUserPushSubscriptions(userId);
+  }
+
+  // Promotions operations
+  async getAllPromotions(): Promise<Promotion[]> {
+    return await db
+      .select()
+      .from(promotions)
+      .orderBy(desc(promotions.sortOrder), desc(promotions.createdAt));
+  }
+
+  async getActivePromotions(): Promise<Promotion[]> {
+    return await db
+      .select()
+      .from(promotions)
+      .where(eq(promotions.isActive, true))
+      .orderBy(desc(promotions.sortOrder), desc(promotions.createdAt));
+  }
+
+  async createPromotion(promo: InsertPromotion): Promise<Promotion> {
+    const [row] = await db.insert(promotions).values(promo as any).returning();
+    return row;
+  }
+
+  async updatePromotion(id: string, promo: Partial<InsertPromotion>): Promise<void> {
+    await db.update(promotions).set({ ...promo, updatedAt: new Date() } as any).where(eq(promotions.id, id));
+  }
+
+  async deletePromotion(id: string): Promise<void> {
+    await db.delete(promotions).where(eq(promotions.id, id));
   }
 
   // Inactive member operations

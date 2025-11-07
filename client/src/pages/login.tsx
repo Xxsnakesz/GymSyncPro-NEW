@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema } from "@shared/schema";
+import { loginSchema } from "@shared/schema.ts";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,10 @@ import { Link, useLocation } from "wouter";
 import { Eye, EyeOff, User, Lock, Dumbbell, Sparkles, ArrowRight } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import idachiLogo from "@assets/image_1759411904981.png";
+import BrandWatermark from "@/components/brand-watermark";
 
 type LoginFormData = z.infer<typeof loginSchema>;
-
+ 
 export default function Login() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -57,60 +58,56 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-100 dark:from-gray-950 dark:via-yellow-950 dark:to-amber-950 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-yellow-300/20 dark:bg-yellow-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-amber-400/20 dark:bg-amber-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-yellow-200/10 dark:bg-yellow-600/5 rounded-full blur-3xl"></div>
-      </div>
+    <div className="min-h-screen w-full bg-background relative overflow-hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {/* Centered transparent brand watermark like dashboard */}
+      <BrandWatermark opacity={0.15} />
 
       <div className="container mx-auto min-h-screen flex items-center justify-center p-4 relative z-10">
         <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-8 items-center">
-          {/* Left Side - Branding */}
+          {/* Left Side - Branding (desktop only) */}
           <div className="hidden lg:flex flex-col justify-center space-y-6 p-8">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-2xl blur-2xl opacity-60 animate-pulse"></div>
-                  <img 
-                    src={idachiLogo} 
-                    alt="Idachi Fitness Logo" 
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary to-neon-purple rounded-2xl blur-xl opacity-60 animate-pulse"></div>
+                  <img
+                    src={idachiLogo}
+                    alt="Idachi Fitness Logo"
                     className="relative h-20 w-20 object-contain rounded-xl"
                   />
                 </div>
-                <h1 className="text-5xl font-bold text-yellow-500 dark:text-yellow-400">
+                <h1 className="text-5xl font-bold bg-gradient-to-r from-primary to-neon-purple bg-clip-text text-transparent">
                   Idachi Fitness
                 </h1>
               </div>
-              
-              <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white leading-tight">
+
+              <h2 className="text-3xl lg:text-4xl font-bold text-foreground leading-tight">
                 Wujudkan Tubuh Impian Anda
               </h2>
-              
-              <p className="text-lg text-gray-700 dark:text-gray-300">
+
+              <p className="text-lg text-muted-foreground">
                 Bergabunglah dengan ribuan member yang telah mencapai target fitness mereka bersama kami.
               </p>
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-yellow-200 dark:border-yellow-800/50 shadow-lg">
-                <div className="p-2 rounded-lg bg-yellow-400/20 dark:bg-yellow-500/20">
-                  <Dumbbell className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-card/80 backdrop-blur-sm border border-border shadow-lg">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Dumbbell className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Akses Unlimited</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Gym equipment terlengkap 24/7</p>
+                  <h3 className="font-semibold text-foreground">Akses Unlimited</h3>
+                  <p className="text-sm text-muted-foreground">Gym equipment terlengkap 24/7</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border border-amber-200 dark:border-amber-800/50 shadow-lg">
-                <div className="p-2 rounded-lg bg-amber-400/20 dark:bg-amber-500/20">
-                  <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-card/80 backdrop-blur-sm border border-border shadow-lg">
+                <div className="p-2 rounded-lg bg-neon-purple/10">
+                  <Sparkles className="h-5 w-5 text-neon-purple" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white">Personal Trainer</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Bimbingan profesional untuk hasil maksimal</p>
+                  <h3 className="font-semibold text-foreground">Personal Trainer</h3>
+                  <p className="text-sm text-muted-foreground">Bimbingan profesional untuk hasil maksimal</p>
                 </div>
               </div>
             </div>
@@ -118,157 +115,179 @@ export default function Login() {
 
           {/* Right Side - Login Form */}
           <div className="w-full">
-            <Card className="border-2 border-yellow-200 dark:border-yellow-800/50 shadow-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl">
-              <CardHeader className="space-y-2 pb-6">
-                <div className="lg:hidden flex justify-center mb-4">
-                  <img 
-                    src={idachiLogo} 
-                    alt="Idachi Fitness Logo" 
-                    className="h-16 w-16 object-contain rounded-xl"
-                    data-testid="img-logo"
-                  />
-                </div>
-                <CardTitle className="text-3xl font-bold text-center text-gray-900 dark:text-white">
-                  Selamat Datang Kembali
-                </CardTitle>
-                <CardDescription className="text-center text-base">
-                  Login untuk melanjutkan perjalanan fitness Anda
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="space-y-6">
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                    <FormField
-                      control={form.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">Email/Nomor Telepon/Username</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                              <Input
-                                placeholder="Masukkan email, nomor telepon, atau username"
-                                className="pl-10 h-12 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:border-yellow-500 dark:focus:border-yellow-400"
-                                data-testid="input-username"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+            {/* Mobile-first: decorative halo behind the card */}
+            <div className="lg:hidden relative max-w-md mx-auto">
+              <div className="pointer-events-none absolute -top-14 left-1/2 -translate-x-1/2 h-28 w-28 rounded-full bg-gradient-to-r from-primary/40 to-neon-purple/40 blur-2xl" />
+            </div>
 
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-700 dark:text-gray-300 font-medium">Password</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                              <Input
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Masukkan password"
-                                className="pl-10 pr-10 h-12 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:border-yellow-500 dark:focus:border-yellow-400"
-                                data-testid="input-password"
-                                {...field}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                data-testid="button-toggle-password"
-                              >
-                                {showPassword ? (
-                                  <EyeOff className="h-5 w-5" />
-                                ) : (
-                                  <Eye className="h-5 w-5" />
-                                )}
-                              </button>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+            {/* Gradient border wrapper for subtle premium feel on mobile */}
+            <div className="mx-auto max-w-md lg:max-w-none lg:mx-0 p-[1.5px] rounded-3xl bg-gradient-to-r from-primary/40 to-neon-purple/40">
+              <Card className="rounded-3xl border border-border/70 shadow-2xl bg-card/90 backdrop-blur-xl">
+                <CardHeader className="space-y-2 pb-6">
+                  <div className="lg:hidden flex justify-center mb-4">
+                    <img
+                      src={idachiLogo}
+                      alt="Idachi Fitness Logo"
+                      className="h-16 w-16 object-contain rounded-xl"
+                      data-testid="img-logo"
                     />
+                  </div>
+                  <CardTitle className="text-3xl font-bold text-center text-foreground">
+                    Selamat Datang Kembali
+                  </CardTitle>
+                  <CardDescription className="text-center text-base">
+                    Login untuk melanjutkan perjalanan fitness Anda
+                  </CardDescription>
+                </CardHeader>
 
-                    <div className="flex items-center justify-between">
+                <CardContent className="space-y-6">
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                       <FormField
                         control={form.control}
-                        name="rememberMe"
+                        name="username"
                         render={({ field }) => (
-                          <FormItem className="flex items-center space-x-2">
+                          <FormItem>
+                            <FormLabel className="text-foreground font-medium">Email/Nomor Telepon/Username</FormLabel>
                             <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                className="border-gray-400 data-[state=checked]:bg-yellow-500 data-[state=checked]:border-yellow-500"
-                                data-testid="checkbox-remember"
-                              />
+                              <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                <Input
+                                  placeholder="Masukkan email, nomor telepon, atau username"
+                                  className="pl-10 h-12 rounded-xl text-base font-medium bg-card/90 dark:bg-card/90 text-foreground placeholder:text-muted-foreground/70 caret-primary border border-border/70 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary shadow-sm"
+                                  autoCapitalize="none"
+                                  autoCorrect="off"
+                                  spellCheck={false}
+                                  inputMode="email"
+                                  autoComplete="username"
+                                  data-testid="input-username"
+                                  {...field}
+                                />
+                              </div>
                             </FormControl>
-                            <FormLabel className="text-sm text-gray-600 dark:text-gray-400 font-normal cursor-pointer">
-                              Remember Me
-                            </FormLabel>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <Link 
-                        href="/forgot-password" 
-                        className="text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 font-medium transition-colors"
-                        data-testid="link-forgot-password"
+
+                      <FormField
+                        control={form.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-foreground font-medium">Password</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                <Input
+                                  type={showPassword ? "text" : "password"}
+                                  placeholder="Masukkan password"
+                                  className="pl-10 pr-10 h-12 rounded-xl text-base font-medium bg-card/90 dark:bg-card/90 text-foreground placeholder:text-muted-foreground/70 caret-primary border border-border/70 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary shadow-sm"
+                                  autoComplete="current-password"
+                                  data-testid="input-password"
+                                  {...field}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPassword(!showPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                  data-testid="button-toggle-password"
+                                >
+                                  {showPassword ? (
+                                    <EyeOff className="h-5 w-5" />
+                                  ) : (
+                                    <Eye className="h-5 w-5" />
+                                  )}
+                                </button>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex items-center justify-between">
+                        <FormField
+                          control={form.control}
+                          name="rememberMe"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  className="border-muted-foreground data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                  data-testid="checkbox-remember"
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm text-muted-foreground font-normal cursor-pointer">
+                                Remember Me
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                        <Link
+                          href="/forgot-password"
+                          className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                          data-testid="link-forgot-password"
+                        >
+                          Lupa Password?
+                        </Link>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        className="group w-full h-12 bg-gradient-to-r from-primary to-neon-purple hover:from-primary/90 hover:to-neon-purple/90 text-white font-semibold text-base shadow-lg shadow-primary/30 transition-all duration-300 hover:shadow-xl hover:shadow-primary/40"
+                        disabled={loginMutation.isPending}
+                        data-testid="button-login"
                       >
-                        Lupa Password?
-                      </Link>
+                        {loginMutation.isPending ? (
+                          <span className="flex items-center gap-2">
+                            <div className="h-5 w-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                            Memproses...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2 justify-center">
+                            Login
+                            <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                          </span>
+                        )}
+                      </Button>
+
+                      {/* Terms & Privacy for mobile */}
+                      <p className="text-center text-xs text-muted-foreground leading-relaxed">
+                        Dengan login, Anda menyetujui{" "}
+                        <Link href="/terms" className="text-primary hover:underline">Syarat & Ketentuan</Link>
+                        {" "}dan{" "}
+                        <Link href="/terms#privacy" className="text-primary hover:underline">Kebijakan Privasi</Link>.
+                      </p>
+                    </form>
+                  </Form>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-border"></div>
                     </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full h-12 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white font-semibold text-base shadow-lg shadow-yellow-500/30 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/40"
-                      disabled={loginMutation.isPending}
-                      data-testid="button-login"
-                    >
-                      {loginMutation.isPending ? (
-                        <span className="flex items-center gap-2">
-                          <div className="h-5 w-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                          Memproses...
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          Login
-                          <ArrowRight className="h-5 w-5" />
-                        </span>
-                      )}
-                    </Button>
-                  </form>
-                </Form>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-card text-muted-foreground">
+                        Belum punya akun?
+                      </span>
+                    </div>
                   </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white dark:bg-gray-900 text-gray-500">
-                      Belum punya akun?
-                    </span>
-                  </div>
-                </div>
 
-                <div className="text-center">
-                  <Link href="/register" data-testid="link-register">
-                    <Button 
-                      variant="outline" 
-                      className="w-full h-12 border-2 border-yellow-300 dark:border-yellow-700 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-950 font-semibold"
-                    >
-                      Daftar Sekarang
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="text-center">
+                    <Link href="/register" data-testid="link-register">
+                      <Button
+                        variant="outline"
+                        className="w-full h-12 border-2 border-primary text-primary hover:bg-primary/10 font-semibold"
+                      >
+                        Daftar Sekarang
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>

@@ -4,15 +4,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import logoPath from "@assets/image_1759411904981.png";
 
 export default function Landing() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [, navigate] = useLocation();
 
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    navigate("/login");
   };
 
   return (

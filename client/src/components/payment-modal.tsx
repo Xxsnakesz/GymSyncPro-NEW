@@ -32,7 +32,7 @@ export default function PaymentModal({ isOpen, onClose }: PaymentModalProps) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>("pending");
 
-  const { data: membershipPlans } = useQuery({
+  const { data: membershipPlans } = useQuery<any[]>({
     queryKey: ["/api/membership-plans"],
     enabled: isOpen,
   });

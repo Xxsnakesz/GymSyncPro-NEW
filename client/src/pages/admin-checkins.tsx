@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import AdminLayout from "@/components/ui/admin-layout";
-import { Clock, Activity, CalendarCheck, Sparkles, Camera, Loader2, X } from "lucide-react";
+import { Clock, Activity, CalendarCheck, Sparkles, Camera, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Html5Qrcode } from "html5-qrcode";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -16,6 +16,7 @@ interface CheckInRecord {
   id: string;
   checkInTime: string;
   status?: string;
+  lockerNumber?: string;
   user?: {
     firstName?: string;
     lastName?: string;
@@ -32,8 +33,7 @@ export default function AdminCheckIns() {
   const { toast } = useToast();
   const { user, isLoading, isAuthenticated } = useAuth();
   const [isScanning, setIsScanning] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [checkInData, setCheckInData] = useState<any>(null);
+  // Success modal removed per request; we will resume scanning immediately after approve
   const [cameraError, setCameraError] = useState("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef<boolean>(false);
@@ -66,31 +66,63 @@ export default function AdminCheckIns() {
     refetchInterval: 10000,
   });
 
-  const validateMutation = useMutation({
+  // Step 1: preview the member info (no creation)
+  const previewMutation = useMutation({
     mutationFn: async (code: string) => {
-      const response = await apiRequest("POST", "/api/admin/checkin/validate", { qrCode: code });
-      return await response.json();
+      const res = await apiRequest("POST", "/api/admin/checkin/preview", { qrCode: code });
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(text && text.startsWith("<!DOCTYPE") ? "Sesi admin berakhir atau rute tidak tersedia. Refresh halaman dan coba lagi." : (text || "Respon tidak valid dari server"));
+      }
+      return await res.json();
     },
     onSuccess: (data) => {
-      setCheckInData(data);
-      setShowSuccessModal(true);
+      if (!data?.success) {
+        toast({ title: "Validasi Gagal", description: data?.message || "QR tidak valid", variant: "destructive" });
+        processingRef.current = false;
+        return;
+      }
+      setApprovalState({
+        open: true,
+        qrCode: data.qrCode,
+        user: data.user,
+        membership: data.membership,
+        lastCheckIn: data.lastCheckIn,
+      });
       stopScanner();
-      refetchCheckIns();
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
-      
-      setTimeout(() => {
-        startScanner();
-      }, 6000);
     },
     onError: (error: any) => {
-      toast({
-        title: "Validasi Gagal",
-        description: error.message || "QR code tidak valid atau sudah expired",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        processingRef.current = false;
-      }, 1000);
+      toast({ title: "Validasi Gagal", description: error.message || "QR code tidak valid atau sudah expired", variant: "destructive" });
+      setTimeout(() => { processingRef.current = false; }, 1000);
+    },
+  });
+
+  // Step 2: approve to create the check-in
+  const approveMutation = useMutation({
+    mutationFn: async (payload: { qrCode: string; lockerNumber?: string }) => {
+      const res = await apiRequest("POST", "/api/admin/checkin/approve", payload);
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(text && text.startsWith("<!DOCTYPE") ? "Sesi admin berakhir atau rute tidak tersedia. Refresh halaman dan coba lagi." : (text || "Respon tidak valid dari server"));
+      }
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      if (!data?.success) {
+        toast({ title: "Gagal", description: data?.message || "Tidak bisa membuat check-in", variant: "destructive" });
+        return;
+      }
+      // Close confirmation and resume scanning without a success modal
+      setApprovalState((prev: any) => ({ ...prev, open: false, lockerNumber: '' }));
+      refetchCheckIns();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/checkins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/dashboard"] });
+      setTimeout(() => { startScanner(); }, 600);
+    },
+    onError: (error: any) => {
+      toast({ title: "Gagal", description: error.message || "Tidak bisa menyetujui check-in", variant: "destructive" });
     },
   });
 
@@ -129,7 +161,7 @@ export default function AdminCheckIns() {
             qrCodeValue = parts[parts.length - 1] || decodedText;
           }
           
-          validateMutation.mutate(qrCodeValue);
+          previewMutation.mutate(qrCodeValue);
         },
         () => {}
       );
@@ -176,6 +208,13 @@ export default function AdminCheckIns() {
       stopScanner();
     };
   }, []);
+
+  const [approvalState, setApprovalState] = useState<any>({ open: false, qrCode: '', user: null, membership: null, lockerNumber: '', lastCheckIn: null });
+
+  const approveCheckIn = () => {
+    if (!approvalState.qrCode) return;
+    approveMutation.mutate({ qrCode: approvalState.qrCode, lockerNumber: approvalState.lockerNumber });
+  };
 
   if (isLoading) {
     return (
@@ -315,7 +354,7 @@ export default function AdminCheckIns() {
           </CardContent>
         </Card>
 
-        {/* Check-ins List */}
+  {/* Check-ins List */}
         <Card className="border-0 bg-[#1E293B] shadow-xl">
           <CardHeader className="pb-3 px-4 pt-4">
             <div className="flex items-center gap-2">
@@ -334,127 +373,168 @@ export default function AdminCheckIns() {
                 <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-[#10B981]/10 flex items-center justify-center">
                   <Camera className="w-8 h-8 text-gray-500" />
                 </div>
-                <p className="text-sm font-medium text-white mb-1">No check-ins yet</p>
-                <p className="text-xs text-gray-400">Check-ins will appear here</p>
+                <p className="text-sm font-medium text-white mb-1">Belum ada check-in</p>
+                <p className="text-xs text-gray-400">Data check-in akan muncul di sini</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {recentCheckIns.map((checkin) => (
-                  <div 
-                    key={checkin.id} 
-                    className="group flex items-center justify-between p-3 rounded-xl bg-[#0F172A] hover:bg-[#0F172A]/80 transition-all border border-gray-700 hover:border-[#10B981] cursor-pointer"
-                    data-testid={`checkin-${checkin.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <Avatar className="h-10 w-10 border-2 border-[#10B981] shadow-lg">
-                          <AvatarImage src={checkin.user?.profileImageUrl} />
-                          <AvatarFallback className="bg-[#10B981] text-white font-semibold text-sm">
-                            {`${checkin.user?.firstName?.[0] || ''}${checkin.user?.lastName?.[0] || ''}` || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#10B981] rounded-full border-2 border-[#0F172A] flex items-center justify-center">
-                          <CalendarCheck className="w-2.5 h-2.5 text-white" />
+              <div className="rounded-xl border border-gray-700 overflow-hidden">
+                {/* Header row */}
+                <div className="hidden md:grid grid-cols-12 gap-3 items-center px-4 py-3 bg-[#0F172A] border-b border-gray-700 text-[11px] uppercase tracking-wide text-gray-400">
+                  <div className="col-span-5">Member</div>
+                  <div className="col-span-2">Plan</div>
+                  <div className="col-span-2">Loker</div>
+                  <div className="col-span-1 text-right">Jam</div>
+                  <div className="col-span-2 text-right">Tanggal</div>
+                </div>
+                {/* Rows */}
+                <div className="max-h-[480px] overflow-auto divide-y divide-gray-800">
+                  {recentCheckIns.map((checkin, idx) => (
+                    <div
+                      key={checkin.id}
+                      className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center px-4 py-3 bg-[#0B1220] hover:bg-[#0B1220]/90 transition-colors"
+                      data-testid={`checkin-${checkin.id}`}
+                    >
+                      {/* Member */}
+                      <div className="col-span-5 flex items-center gap-3">
+                        <div className="relative">
+                          <Avatar className="h-10 w-10 border-2 border-[#10B981] shadow-lg">
+                            <AvatarImage src={checkin.user?.profileImageUrl} />
+                            <AvatarFallback className="bg-[#10B981] text-white font-semibold text-sm">
+                              {`${checkin.user?.firstName?.[0] || ''}${checkin.user?.lastName?.[0] || ''}` || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#10B981] rounded-full border-2 border-[#0B1220] flex items-center justify-center">
+                            <CalendarCheck className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-white truncate">{checkin.user?.firstName} {checkin.user?.lastName}</p>
+                          <p className="text-[11px] text-gray-400 truncate">{format(new Date(checkin.checkInTime), 'EEEE')}</p>
                         </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm text-white group-hover:text-[#10B981] transition-colors">
-                          {checkin.user?.firstName} {checkin.user?.lastName}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className="text-xs font-medium bg-[#10B981]/20 text-[#10B981] border-[#10B981]/30">
-                            {checkin.membership?.plan?.name || 'No Plan'}
-                          </Badge>
+
+                      {/* Plan */}
+                      <div className="col-span-2 flex md:justify-start">
+                        <Badge className="text-xs font-medium bg-[#10B981]/20 text-[#10B981] border-[#10B981]/30">
+                          {checkin.membership?.plan?.name || 'No Plan'}
+                        </Badge>
+                      </div>
+
+                      {/* Locker */}
+                      <div className="col-span-2 text-left">
+                        {checkin.lockerNumber ? (
+                          <Badge className="text-xs font-medium bg-blue-500/20 text-blue-400 border-blue-500/30">Loker #{checkin.lockerNumber}</Badge>
+                        ) : (
+                          <span className="text-xs text-gray-500">-</span>
+                        )}
+                      </div>
+
+                      {/* Time */}
+                      <div className="col-span-1 md:text-right">
+                        <div className="flex md:justify-end items-center gap-1 text-sm">
+                          <Clock size={14} className="text-gray-400" />
+                          <span className="font-semibold text-white">{format(new Date(checkin.checkInTime), 'HH:mm')}</span>
                         </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 justify-end">
-                        <Clock size={14} className="text-gray-400" />
-                        <p className="font-semibold text-white text-sm">
-                          {format(new Date(checkin.checkInTime), 'HH:mm')}
-                        </p>
+
+                      {/* Date */}
+                      <div className="col-span-2 md:text-right">
+                        <span className="text-xs text-gray-400">{format(new Date(checkin.checkInTime), 'dd MMM yyyy')}</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {format(new Date(checkin.checkInTime), 'dd MMM yyyy')}
-                      </p>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Success Modal Pop-up */}
-      {showSuccessModal && checkInData && (
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300"
-          onClick={() => setShowSuccessModal(false)}
-          data-testid="modal-success-overlay"
-        >
-          <div 
-            className="bg-[#1E293B] rounded-2xl shadow-2xl border-2 border-[#10B981] w-full max-w-[400px] h-[500px] overflow-auto animate-in slide-in-from-bottom-4 duration-300"
-            onClick={(e) => e.stopPropagation()}
-            data-testid="modal-success-content"
-          >
-            {/* Close Button */}
-            <button
-              onClick={() => setShowSuccessModal(false)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-10"
-              data-testid="button-close-modal"
-            >
-              <X className="w-4 h-4 text-white" />
-            </button>
+      {/* Success Modal removed per request */}
 
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[#10B981] to-emerald-500 px-6 py-6 text-center relative">
-              <div className="w-20 h-20 mx-auto mb-3 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <CalendarCheck className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white">Check-in Berhasil!</h3>
-              <p className="text-sm text-white/90 mt-1">
-                ✅ {checkInData.checkInTime ? format(new Date(checkInData.checkInTime), "HH:mm | dd MMM yyyy") : format(new Date(), "HH:mm | dd MMM yyyy")}
-              </p>
+      {/* Approve Check-in Dialog - redesigned wide confirmation card */}
+      {approvalState.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setApprovalState((p: any) => ({ ...p, open: false }))}>
+          <div className="bg-white dark:bg-[#0F172A] rounded-3xl w-full max-w-3xl shadow-2xl border border-gray-700 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-gray-700/60 bg-gradient-to-r from-emerald-600/20 to-transparent">
+              <h3 className="text-lg font-bold text-white">Konfirmasi Check-in</h3>
+              <p className="text-xs text-gray-300">Periksa data member lalu masukkan nomor loker sebelum menyetujui</p>
             </div>
-
-            {/* Member Info */}
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="w-20 h-20 border-4 border-[#10B981] shadow-lg">
-                  <AvatarImage src={checkInData.user?.profileImageUrl} />
-                  <AvatarFallback className="bg-[#10B981] text-white font-bold text-xl">
-                    {`${checkInData.user?.firstName?.[0] || ''}${checkInData.user?.lastName?.[0] || ''}`}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <h4 className="text-xl font-bold text-white" data-testid="text-member-name">
-                    {checkInData.user?.firstName} {checkInData.user?.lastName}
-                  </h4>
-                  <p className="text-sm text-gray-400 mt-1" data-testid="text-member-email">
-                    {checkInData.user?.email}
-                  </p>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6">
+              <div className="space-y-3">
+                <div className="w-full aspect-[4/5] rounded-xl overflow-hidden bg-[#1E293B] border border-gray-700">
+                  {approvalState.user?.profileImageUrl ? (
+                    <img src={approvalState.user.profileImageUrl} alt="Foto Member" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-gray-400 text-sm">No Photo</div>
+                  )}
+                </div>
+                <div className="bg-[#0B1220] rounded-xl p-3 border border-gray-700">
+                  <div className="text-[11px] uppercase tracking-wide text-gray-400">Nomor Loker</div>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 27"
+                    value={approvalState.lockerNumber || ''}
+                    onChange={(e) => setApprovalState((p: any) => ({ ...p, lockerNumber: e.target.value }))}
+                    className="mt-1 w-full rounded-md border border-gray-700 bg-[#0F172A] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500/60"
+                  />
                 </div>
               </div>
-
-              {/* Membership Info */}
-              {checkInData.membership && (
-                <div className="bg-[#0F172A] rounded-xl p-4 border border-gray-700">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-400">Membership</span>
-                    <Badge className="bg-[#10B981]/20 text-[#10B981] border-[#10B981]/30 text-xs">
-                      {checkInData.membership.plan?.name}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-400">Berlaku Hingga</span>
-                    <span className="text-sm font-semibold text-white" data-testid="text-membership-expiry">
-                      {format(new Date(checkInData.membership.endDate), "dd MMM yyyy")}
-                    </span>
+              <div className="space-y-5">
+                <div>
+                  <div className="text-xs text-gray-400">Member</div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <Avatar className="h-12 w-12 border-2 border-emerald-500/40">
+                      <AvatarImage src={approvalState.user?.profileImageUrl} />
+                      <AvatarFallback className="bg-emerald-600 text-white">
+                        {`${approvalState.user?.firstName?.[0] || ''}${approvalState.user?.lastName?.[0] || ''}` || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-base font-semibold text-white">{approvalState.user?.firstName} {approvalState.user?.lastName}</p>
+                      <p className="text-xs text-gray-400">{approvalState.user?.email}</p>
+                    </div>
                   </div>
                 </div>
-              )}
+                {approvalState.membership && (
+                  <div className="bg-[#0B1220] rounded-xl p-4 border border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium text-white">{approvalState.membership.plan?.name}</div>
+                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30 text-[11px]">Active</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] text-gray-400">Mulai</div>
+                        <div className="font-semibold text-white">{format(new Date(approvalState.membership.startDate), 'dd MMM yyyy')}</div>
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] text-gray-400">Berakhir</div>
+                        <div className="font-semibold text-white">{format(new Date(approvalState.membership.endDate), 'dd MMM yyyy')}</div>
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] text-gray-400">Sisa Hari</div>
+                        <div className="font-semibold text-white">{Math.max(0, Math.ceil((new Date(approvalState.membership.endDate).getTime() - Date.now()) / (1000*60*60*24)))}</div>
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] text-gray-400">Perpanjangan</div>
+                        <div className="font-semibold text-white">{approvalState.membership.autoRenewal ? 'Auto-renew' : 'Manual'}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {approvalState.lastCheckIn && (
+                  <div className="bg-[#0B1220] rounded-xl p-4 border border-gray-700">
+                    <div className="text-xs text-gray-400">Check-in Terakhir</div>
+                    <div className="mt-1 text-sm font-semibold text-white">{format(new Date(approvalState.lastCheckIn.checkInTime), 'HH:mm • dd MMM yyyy')}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-6 py-5 border-t border-gray-700/60 flex justify-end gap-2 bg-[#0B1220]">
+              <Button variant="outline" onClick={() => setApprovalState((p: any) => ({ ...p, open: false }))}>Batal</Button>
+              <Button onClick={approveCheckIn} disabled={approveMutation.isPending} className="bg-emerald-600 hover:bg-emerald-500">
+                {approveMutation.isPending ? 'Menyetujui...' : 'Setujui & Simpan'}
+              </Button>
             </div>
           </div>
         </div>

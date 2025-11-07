@@ -78,25 +78,25 @@ export default function MemberDashboard() {
     }
   };
 
-  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+  const { data: dashboardData, isLoading: dashboardLoading } = useQuery<any>({
     queryKey: ["/api/member/dashboard"],
     enabled: isAuthenticated,
     retry: false,
   });
 
-  const { data: classes } = useQuery({
+  const { data: classes } = useQuery<any[]>({
     queryKey: ["/api/classes"],
     enabled: isAuthenticated,
     retry: false,
   });
 
-  const { data: expiringMemberships } = useQuery({
+  const { data: expiringMemberships } = useQuery<any[]>({
     queryKey: ["/api/notifications/expiring"],
     enabled: isAuthenticated,
     retry: false,
   });
 
-  const { data: trainers } = useQuery({
+  const { data: trainers } = useQuery<any[]>({
     queryKey: ["/api/trainers"],
     enabled: isAuthenticated,
     retry: false,

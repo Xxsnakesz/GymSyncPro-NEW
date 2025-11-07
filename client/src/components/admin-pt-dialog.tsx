@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
-import type { PersonalTrainer } from "@shared/schema";
+import type { PersonalTrainer } from "@shared/schema.ts";
 
 const trainerSchema = z.object({
   name: z.string().min(1, "Nama diperlukan"),
@@ -19,7 +19,7 @@ const trainerSchema = z.object({
   specialization: z.string().min(1, "Spesialisasi diperlukan"),
   experience: z.string().optional(),
   certification: z.string().optional(),
-  imageUrl: z.string().url("URL gambar tidak valid").optional().or(z.literal("")),
+  imageUrl: z.string().optional().or(z.literal("")),
   pricePerSession: z.string().min(1, "Harga per sesi diperlukan"),
 });
 
@@ -34,6 +34,9 @@ interface AdminPTDialogProps {
 export default function AdminPTDialog({ open, onOpenChange, trainer }: AdminPTDialogProps) {
   const { toast } = useToast();
   const isEditing = !!trainer;
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<string | undefined>(undefined);
 
   const form = useForm<TrainerFormData>({
     resolver: zodResolver(trainerSchema),
@@ -135,6 +138,33 @@ export default function AdminPTDialog({ open, onOpenChange, trainer }: AdminPTDi
     }
   };
 
+  const handlePickFile = () => fileInputRef.current?.click();
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Format tidak didukung', description: 'Pilih file gambar (PNG/JPG/WEBP).', variant: 'destructive' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setPreview(dataUrl);
+      try {
+        setUploading(true);
+        const res = await apiRequest('POST', '/api/admin/upload-image', { dataUrl });
+        const json = await res.json();
+        form.setValue('imageUrl', json.url, { shouldDirty: true });
+        toast({ title: 'Foto terunggah', description: 'Foto profil berhasil diunggah.' });
+      } catch (err: any) {
+        toast({ title: 'Gagal unggah', description: err?.message || 'Tidak bisa mengunggah foto', variant: 'destructive' });
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -147,6 +177,25 @@ export default function AdminPTDialog({ open, onOpenChange, trainer }: AdminPTDi
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Foto profil uploader */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Foto Profil</span>
+                  <span className="text-xs text-muted-foreground">Upload foto profil trainer</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={handlePickFile} disabled={uploading}>
+                  {uploading ? 'Mengunggah…' : 'Pilih Foto'}
+                </Button>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFileChange} />
+              {(preview || form.watch('imageUrl')) && (
+                <div className="aspect-[1/1] w-40 overflow-hidden rounded-md border border-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview || form.watch('imageUrl')!} alt="Foto Profil" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
             <FormField
               control={form.control}
               name="name"
@@ -261,24 +310,7 @@ export default function AdminPTDialog({ open, onOpenChange, trainer }: AdminPTDi
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL Foto Profil</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="url"
-                      placeholder="https://example.com/photo.jpg" 
-                      {...field} 
-                      data-testid="input-trainer-image"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* URL field removed in favor of uploader */}
 
             <div className="flex justify-end space-x-2 pt-4">
               <Button

@@ -10,7 +10,7 @@ import AdminLayout from "@/components/ui/admin-layout";
 import AdminPTDialog from "@/components/admin-pt-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Edit, Trash2, DollarSign, Award } from "lucide-react";
-import type { PersonalTrainer } from "@shared/schema";
+import type { PersonalTrainer } from "@shared/schema.ts";
 
 export default function AdminTrainers() {
   const { toast } = useToast();

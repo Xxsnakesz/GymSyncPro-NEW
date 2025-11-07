@@ -36,8 +36,13 @@ export default function AdminCheckInModal({ open, onClose, onSuccess }: AdminChe
 
   const validateMutation = useMutation({
     mutationFn: async (code: string) => {
-      const response = await apiRequest("POST", "/api/admin/checkin/validate", { qrCode: code });
-      return await response.json();
+      const res = await apiRequest("POST", "/api/admin/checkin/validate", { qrCode: code });
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(text && text.startsWith("<!DOCTYPE") ? "Sesi admin berakhir atau rute tidak tersedia. Refresh halaman dan coba lagi." : (text || "Respon tidak valid dari server"));
+      }
+      return await res.json();
     },
     onSuccess: (data) => {
       setMemberData(data);

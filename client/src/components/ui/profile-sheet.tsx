@@ -11,11 +11,22 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import PushNotificationToggle from "@/components/push-notification-toggle";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ProfileSheetProps {
   children: React.ReactNode;
@@ -30,9 +41,14 @@ export default function ProfileSheet({ children, open, onOpenChange }: ProfileSh
 
   const logoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/logout"),
-    onSuccess: () => {
-      window.location.href = "/";
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Logout berhasil" });
+      navigate("/login");
     },
+    onError: (err: any) => {
+      toast({ title: "Logout gagal", description: err?.message || "Silakan coba lagi", variant: "destructive" });
+    }
   });
 
   const handleMenuClick = (action: string) => {
@@ -169,17 +185,37 @@ export default function ProfileSheet({ children, open, onOpenChange }: ProfileSh
 
         <Separator className="my-6" />
 
-        {/* Logout Button */}
-        <Button
-          onClick={() => logoutMutation.mutate()}
-          disabled={logoutMutation.isPending}
-          variant="outline"
-          className="w-full h-14 rounded-2xl border-2 border-destructive/20 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 active:scale-98 font-semibold mb-4"
-          data-testid="button-logout"
-        >
-          <LogOut className="h-5 w-5 mr-2" />
-          {logoutMutation.isPending ? "Logging out..." : "Log Out"}
-        </Button>
+        {/* Logout Button with confirmation */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              disabled={logoutMutation.isPending}
+              variant="outline"
+              className="w-full h-14 rounded-2xl border-2 border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all duration-200 active:scale-98 font-semibold mb-4"
+              data-testid="button-logout"
+            >
+              <LogOut className="h-5 w-5 mr-2" />
+              {logoutMutation.isPending ? "Keluar…" : "Logout"}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Keluar dari akun?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Anda akan keluar dari sesi ini. Anda bisa login kembali kapan saja.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => logoutMutation.mutate()}
+              >
+                Ya, Logout
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <p className="text-center text-xs text-muted-foreground pb-2">
           Idachi Fitness v1.0.0

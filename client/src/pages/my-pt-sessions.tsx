@@ -117,7 +117,7 @@ export default function MyPtSessions() {
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: any; label: string }> = {
       scheduled: { variant: "default", label: "Dijadwalkan" },
-      completed: { variant: "success", label: "Selesai" },
+      completed: { variant: "default", label: "Selesai" },
       cancelled: { variant: "destructive", label: "Dibatalkan" },
       no_show: { variant: "destructive", label: "Tidak Hadir" },
     };
@@ -128,7 +128,7 @@ export default function MyPtSessions() {
   if (packagesLoading || sessionsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <Navigation />
+        <Navigation user={user} />
         <div className="pt-16 pb-20 px-4">
           <div className="flex items-center justify-center h-64">
             <div className="h-8 w-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" />
@@ -141,7 +141,7 @@ export default function MyPtSessions() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navigation />
+      <Navigation user={user} />
       <div className="pt-16 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -243,7 +243,7 @@ export default function MyPtSessions() {
                           </Badge>
                           {getStatusBadge(session.status)}
                           {session.adminConfirmed && (
-                            <Badge variant="success" className="text-xs">
+                            <Badge variant="default" className="text-xs">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Terkonfirmasi
                             </Badge>

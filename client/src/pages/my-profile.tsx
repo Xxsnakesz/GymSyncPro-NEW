@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, Edit, Mail, Phone, User, Calendar, MapPin } from "lucide-react";
+import { ArrowLeft, Camera, Edit, Mail, Phone, User, Calendar, MapPin, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,10 +6,28 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function MyProfile() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/logout", {});
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Logout berhasil" });
+      navigate("/login");
+    },
+    onError: (error: any) => {
+      toast({ title: "Logout gagal", description: error?.message || "Silakan coba lagi", variant: "destructive" });
+    },
+  });
 
   if (!user) {
     return null;
@@ -82,11 +100,21 @@ export default function MyProfile() {
               
               <div>
                 <h2 className="text-2xl font-bold">{`${user.firstName} ${user.lastName}`}</h2>
-                <div className="mt-2 inline-flex items-center gap-2 bg-primary/20 px-4 py-1.5 rounded-full">
-                  <div className="w-2 h-2 bg-neon-green rounded-full animate-pulse" />
-                  <span className="text-sm font-semibold text-primary capitalize">
-                    {user.role}
-                  </span>
+                <div className="mt-2 flex items-center gap-2 flex-wrap justify-center">
+                  <div className="inline-flex items-center gap-2 bg-primary/20 px-4 py-1.5 rounded-full">
+                    <div className="w-2 h-2 bg-neon-green rounded-full animate-pulse" />
+                    <span className="text-sm font-semibold text-primary capitalize">
+                      {user.role}
+                    </span>
+                  </div>
+                  {user.active === false && (
+                    <div className="inline-flex items-center gap-2 bg-yellow-500/20 px-4 py-1.5 rounded-full border border-yellow-500/30">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                      <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">
+                        Cuti
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -129,6 +157,23 @@ export default function MyProfile() {
           </Card>
         </div>
 
+        {/* Account Status: Cuti notice */}
+        {user.active === false && (
+          <Card className="border-yellow-500/20 bg-yellow-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-yellow-500/20">
+                  <Calendar className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">Status Akun: Cuti</p>
+                  <p className="text-sm text-muted-foreground">Selama Cuti, fitur Check-in dan Booking dinonaktifkan. Hubungi admin untuk mengaktifkan kembali akun Anda.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Email Verification Status */}
         <Card className={user.emailVerified ? "border-green-500/20 bg-green-500/5" : "border-yellow-500/20 bg-yellow-500/5"}>
           <CardContent className="p-4">
@@ -156,6 +201,26 @@ export default function MyProfile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Logout */}
+        <div className="pt-2">
+          <Button
+            variant="destructive"
+            className="w-full h-12 font-semibold"
+            onClick={() => logoutMutation.mutate()}
+            disabled={logoutMutation.isPending}
+            data-testid="button-logout"
+          >
+            {logoutMutation.isPending ? (
+              <span>Keluar…</span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <LogOut className="h-5 w-5" />
+                Logout
+              </span>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

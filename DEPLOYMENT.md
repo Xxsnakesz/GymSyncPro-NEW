@@ -71,7 +71,20 @@ ADMIN_SECRET_KEY=<secret-key-untuk-admin-registration>
 
 # EMAIL (WAJIB UNTUK FITUR EMAIL)
 RESEND_API_KEY=re_xxxxxxxxxxxxx
-RESEND_FROM_EMAIL=noreply@yourdomain.com
+# Default FROM (fallback jika stream khusus tidak diset)
+RESEND_FROM_EMAIL=support@adityafajrian.my.id
+
+# Stream terpisah (opsional tapi direkomendasikan):
+# 1) Admin outbound (panel admin kirim ke member)
+#    - gunakan alamat/identity berbeda (mis. support@ / hello@) dan opsional API key berbeda
+RESEND_FROM_EMAIL_ADMIN=support@adityafajrian.my.id
+RESEND_API_KEY_ADMIN=
+RESEND_REPLY_TO_ADMIN=cs@adityafajrian.my.id
+
+# 2) Verification (kode OTP/konfirmasi)
+#    - gunakan alamat/identity berbeda (mis. no-reply@) dan opsional API key berbeda
+RESEND_FROM_EMAIL_VERIFICATION=no-reply@adityafajrian.my.id
+RESEND_API_KEY_VERIFICATION=
 
 # PAYMENT (OPSIONAL)
 STRIPE_SECRET_KEY=sk_live_xxxxx
@@ -104,6 +117,20 @@ Kemudian jalankan migration untuk membuat tabel:
 npm run db:push
 ```
 
+#### Catatan: Kolom Poster Kelas (image_url)
+
+Fitur poster untuk kelas membutuhkan kolom baru `image_url` pada tabel `gym_classes`. Jika Anda meng-upgrade dari versi sebelumnya, jalankan sinkronisasi schema agar kolom tersebut dibuat:
+
+```powershell
+# Windows PowerShell contoh (Neon/Supabase/PG):
+# Pastikan sudah set DATABASE_URL di environment Anda
+$env:DATABASE_URL = "postgresql://user:pass@host:5432/dbname"; npm run db:push
+```
+
+Jika Anda menggunakan shell lain atau CI, sesuaikan cara menyetel `DATABASE_URL` sebelum menjalankan `npm run db:push`.
+
+Setelah migrasi, Admin dapat mengunggah gambar poster, dan server akan menyajikannya dari endpoint statis `/uploads/...`.
+
 ### 5. Setup Email (Resend)
 
 1. Daftar di https://resend.com
@@ -112,6 +139,15 @@ npm run db:push
 4. Update `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` di file `.env`
 
 > **Penting**: Untuk production, Anda harus verifikasi domain. Email dari "onboarding@resend.dev" hanya untuk development.
+
+#### Admin: Kirim Email Manual (Opsional)
+
+Jika `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` sudah dikonfigurasi, Admin dapat mengirim email ke member langsung dari halaman Admin → Members. Untuk pemisahan yang rapi agar tidak "tabrakan" dengan email verifikasi, Anda dapat menyetel variabel berikut:
+
+- `RESEND_FROM_EMAIL_ADMIN` (+ opsional `RESEND_API_KEY_ADMIN`, `RESEND_REPLY_TO_ADMIN`)
+- `RESEND_FROM_EMAIL_VERIFICATION` (+ opsional `RESEND_API_KEY_VERIFICATION`)
+
+Aplikasi akan otomatis memakai stream yang sesuai: verifikasi menggunakan konfigurasi verifikasi, sedangkan email dari panel admin menggunakan konfigurasi admin.
 
 ### 6. Build Aplikasi
 
@@ -200,6 +236,23 @@ sudo ufw enable
 ```
 
 ## 🔧 Konfigurasi Lanjutan
+
+### WhatsApp Cloud API (Opsional)
+
+Jika ingin Admin dapat mengirimkan pesan WhatsApp ke member langsung dari panel admin:
+
+1. Daftar/aktifkan WhatsApp Cloud API di Meta for Developers.
+2. Dapatkan Phone Number ID dan Permanent Token dari Meta Business.
+3. Tambahkan environment variables berikut pada `.env`:
+
+```env
+WHATSAPP_TOKEN=EAAG... (permanent token)
+WHATSAPP_PHONE_NUMBER_ID=123456789012345
+```
+
+Jika variabel ini belum diset, endpoint akan merespon 503 dan tombol di Admin tetap ada namun pengiriman akan gagal dengan pesan yang ramah.
+
+Catatan: Sistem akan menormalkan nomor ke format E.164 Indonesia (+62...). Pastikan data `phone` member valid.
 
 ### Push Notifications (Opsional)
 
@@ -316,6 +369,11 @@ pm2 restart idachi-fitness
 2. **Vite Plugins**: Plugins `@replit/vite-plugin-*` hanya akan aktif jika `REPL_ID` environment variable ada. Di server sendiri, plugins ini tidak akan load - tidak masalah.
 
 3. **Database Migration**: Gunakan `npm run db:push` untuk sync schema. Untuk production yang lebih aman, pertimbangkan menggunakan migration tools.
+
+4. **Upload Gambar & Static Files**:
+   - Endpoint admin untuk upload gambar tersedia di `POST /api/admin/upload-image` (hanya admin).
+   - Berkas disimpan ke folder `uploads/` di root proyek. Server secara otomatis melayani file tersebut melalui path `/uploads/...`.
+   - Pastikan disk memiliki izin tulis pada direktori aplikasi (khususnya folder `uploads`).
 
 4. **Email Development**: Tanpa `RESEND_FROM_EMAIL`, sistem akan fallback ke "onboarding@resend.dev" yang hanya untuk development.
 

@@ -268,7 +268,7 @@ export default function AdminPTSessions() {
                                    session.status}
                                 </Badge>
                                 {session.adminConfirmed && (
-                                  <Badge variant="success" className="text-xs">
+                                  <Badge variant="default" className="text-xs">
                                     <CheckCircle className="h-3 w-3 mr-1" />
                                     Terkonfirmasi
                                   </Badge>
@@ -288,7 +288,7 @@ export default function AdminPTSessions() {
                                   Konfirmasi
                                 </Button>
                               ) : session.adminConfirmed ? (
-                                <Badge variant="success">
+                                <Badge variant="default">
                                   <CheckCircle className="h-3 w-3 mr-1" />
                                   Dikonfirmasi
                                 </Badge>

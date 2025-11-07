@@ -1,16 +1,19 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
-import * as midtransClient from 'midtrans-client';
 import passport from "passport";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin } from "./auth";
-import { insertMembershipPlanSchema, insertGymClassSchema, insertClassBookingSchema, insertCheckInSchema, insertPaymentSchema, registerSchema, loginSchema, forgotPasswordRequestSchema, resetPasswordSchema, verifyEmailSchema } from "@shared/schema";
+import { insertMembershipPlanSchema, insertGymClassSchema, insertClassBookingSchema, insertCheckInSchema, insertPaymentSchema, registerSchema, loginSchema, forgotPasswordRequestSchema, resetPasswordSchema, verifyEmailSchema, insertPromotionSchema } from "@shared/schema";
 import { sendPasswordResetEmail } from "./email/resend";
 import { z } from "zod";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "node:crypto";
+import fs from 'fs';
+import path from 'path';
 import { sendNotificationWithPush } from "./push";
+import { normalizePhone, sendWhatsAppText } from "./whatsapp";
+import { getUncachableResendClient, getResendClientForAdmin, buildBrandedEmailHtml, buildBrandedEmailHtmlWithCta, textToSafeHtml } from "./email/resend";
 
 // Temporary storage for email verification codes (before user creation)
 const pendingVerifications = new Map<string, { code: string; expiresAt: Date }>();
@@ -34,29 +37,106 @@ if (process.env.STRIPE_SECRET_KEY) {
   });
 }
 
-// Indonesian Payment Gateway - Midtrans
-let midtransCore: any = null;
-let midtransSnap: any = null;
-
-if (process.env.MIDTRANS_SERVER_KEY) {
-  const isProduction = process.env.MIDTRANS_ENVIRONMENT === 'production';
-  
-  midtransCore = new midtransClient.CoreApi({
-    isProduction,
-    serverKey: process.env.MIDTRANS_SERVER_KEY,
-    clientKey: process.env.MIDTRANS_CLIENT_KEY || '',
-  });
-  
-  midtransSnap = new midtransClient.Snap({
-    isProduction,
-    serverKey: process.env.MIDTRANS_SERVER_KEY,
-    clientKey: process.env.MIDTRANS_CLIENT_KEY || '',
-  });
-}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Public health check (no auth required)
+  app.get('/api/health', async (_req, res) => {
+    const startedAt = new Date().toISOString();
+    let dbConnected = true as boolean;
+    let dbError: string | undefined;
+    try {
+      // Lightweight DB check: attempt a simple query via storage
+      // Using getAllUsers is safe for connectivity validation; we don't return its data
+      await storage.getAllUsers();
+    } catch (e: any) {
+      dbConnected = false;
+      dbError = e?.message || 'Unknown DB error';
+    }
+    res.json({ ok: true, env: app.get('env'), startedAt, dbConnected, dbError });
+  });
+
+  // Integrations health (no auth, safe info only)
+  app.get('/api/health/integrations', async (_req, res) => {
+    const resp: any = { ok: true };
+    // Resend status (do not expose secrets)
+    const resendConfigured = Boolean(process.env.RESEND_API_KEY);
+    const adminKeyConfigured = Boolean(process.env.RESEND_API_KEY_ADMIN);
+    const verifKeyConfigured = Boolean(process.env.RESEND_API_KEY_VERIFICATION);
+    resp.resend = {
+      configured: resendConfigured,
+      default: {
+        fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+      },
+      admin: {
+        apiKeyOverride: adminKeyConfigured,
+        fromEmail: process.env.RESEND_FROM_EMAIL_ADMIN || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+        replyTo: process.env.RESEND_REPLY_TO_ADMIN || undefined,
+      },
+      verification: {
+        apiKeyOverride: verifKeyConfigured,
+        fromEmail: process.env.RESEND_FROM_EMAIL_VERIFICATION || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+      },
+    };
+    if (resendConfigured) {
+      try {
+        const { client } = await (await import('./email/resend')).getUncachableResendClient();
+        const anyFrom = resp.resend.admin.fromEmail || resp.resend.default.fromEmail;
+        const domain = anyFrom.includes('@') ? anyFrom.split('@')[1]?.trim() : '';
+        // Best-effort: check domain list if SDK supports it
+        const anyClient: any = client as any;
+        if (anyClient?.domains?.list && domain) {
+          const result = await anyClient.domains.list();
+          const domains = result?.data || result || [];
+          const found = domains.find((d: any) => d?.name === domain);
+          resp.resend.domain = found ? { name: found.name, status: found.status || 'unknown' } : { name: domain, status: 'unknown' };
+        }
+      } catch (e: any) {
+        resp.resend.error = e?.message || String(e);
+      }
+    }
+    res.json(resp);
+  });
+
+  // Admin image upload (base64 data URL)
+  app.post('/api/admin/upload-image', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { dataUrl } = req.body as { dataUrl?: string };
+      if (!dataUrl || typeof dataUrl !== 'string') {
+        return res.status(400).json({ message: 'Gambar tidak valid' });
+      }
+
+      const match = dataUrl.match(/^data:(image\/(png|jpeg|jpg|webp));base64,(.+)$/);
+      if (!match) {
+        return res.status(400).json({ message: 'Format gambar harus PNG/JPEG/WEBP' });
+      }
+
+      const mime = match[1];
+      const ext = mime.split('/')[1] === 'jpeg' ? 'jpg' : mime.split('/')[1];
+      const base64 = match[3];
+      const buffer = Buffer.from(base64, 'base64');
+
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      await fs.promises.mkdir(uploadsDir, { recursive: true });
+      const filename = `${randomUUID()}.${ext}`;
+      const filePath = path.join(uploadsDir, filename);
+      await fs.promises.writeFile(filePath, buffer);
+
+      const url = `/uploads/${filename}`;
+      res.json({ url });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      res.status(500).json({ message: 'Gagal mengunggah gambar' });
+    }
+  });
 
   // Register route
   app.post('/api/register', async (req, res) => {
@@ -635,9 +715,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentCrowd: crowdCount,
         }
       });
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard data" });
+    } catch (error: any) {
+      console.error("Error fetching dashboard data:", error?.stack || error);
+      const status = error?.status || error?.statusCode || 500;
+      const message = error?.message || (status === 503 ? "Service Unavailable" : "Failed to fetch dashboard data");
+      res.status(status).json({ message });
     }
   });
 
@@ -669,9 +751,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         membership,
         hasActiveMembership 
       });
-    } catch (error) {
-      console.error("Error generating QR code:", error);
-      res.status(500).json({ message: "Failed to generate QR code" });
+    } catch (error: any) {
+      // Log full error stack for debugging
+      console.error("Error generating QR code:", error?.stack || error);
+
+      // In development include error.message in response to help debugging in the browser
+      const responsePayload: any = { message: "Failed to generate QR code" };
+      if (process.env.NODE_ENV === "development") {
+        responsePayload.error = error?.message || String(error);
+      }
+
+      res.status(500).json(responsePayload);
     }
   });
 
@@ -810,9 +900,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create check-in
-      const { randomUUID } = await import('crypto');
-      const checkInQr = randomUUID();
+  // Create check-in
+  const checkInQr = randomUUID();
       const checkIn = await storage.createCheckIn({
         userId: memberUser.id,
         qrCode: checkInQr,
@@ -1106,6 +1195,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: send WhatsApp message to a member
+  app.post('/api/admin/whatsapp/send', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { memberId, phone, message, previewUrl } = req.body || {};
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return res.status(400).json({ message: 'Pesan tidak boleh kosong' });
+      }
+
+      let targetPhone: string | undefined;
+      if (memberId) {
+        const target = await storage.getUser(memberId);
+        if (!target) return res.status(404).json({ message: 'Member tidak ditemukan' });
+  targetPhone = normalizePhone((target as any).phone || undefined);
+      } else {
+        targetPhone = normalizePhone(phone);
+      }
+
+      if (!targetPhone) {
+        return res.status(400).json({ message: 'Nomor WhatsApp tidak valid atau tidak tersedia' });
+      }
+
+      const result = await sendWhatsAppText(targetPhone, message.trim(), Boolean(previewUrl));
+      res.json({ success: true, result });
+    } catch (error: any) {
+      const status = error?.status || error?.statusCode || 500;
+      res.status(status).json({ message: error?.message || 'Gagal mengirim pesan WhatsApp' });
+    }
+  });
+
+  // Admin: send Email message to a member
+  app.post('/api/admin/email/send', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      if (user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+  const { memberId, email, subject, message, ctaText, ctaUrl } = req.body || {};
+      if (!subject || typeof subject !== 'string' || subject.trim().length === 0) {
+        return res.status(400).json({ message: 'Subject tidak boleh kosong' });
+      }
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return res.status(400).json({ message: 'Pesan tidak boleh kosong' });
+      }
+
+      let targetEmail: string | undefined;
+      if (memberId) {
+        const target = await storage.getUser(memberId);
+        if (!target) return res.status(404).json({ message: 'Member tidak ditemukan' });
+        targetEmail = (target as any).email || undefined;
+      } else {
+        targetEmail = email;
+      }
+
+      if (!targetEmail) {
+        return res.status(400).json({ message: 'Email tidak valid atau tidak tersedia' });
+      }
+
+  const { client, fromEmail, replyTo } = getResendClientForAdmin();
+
+      const html = (ctaText && ctaUrl)
+        ? buildBrandedEmailHtmlWithCta(subject.trim(), textToSafeHtml(message), String(ctaText), String(ctaUrl))
+        : buildBrandedEmailHtml(subject.trim(), textToSafeHtml(message));
+
+      const payload: any = {
+        from: fromEmail,
+        to: targetEmail,
+        subject: subject.trim(),
+        html,
+        tags: [{ name: 'stream', value: 'admin' }],
+      };
+      if (replyTo) payload.reply_to = replyTo;
+      const result = await (client as any).emails.send(payload);
+      // Log for operations visibility (non-sensitive)
+      console.log(`[Email] Admin send -> to: ${targetEmail}, from: ${fromEmail}, subject: ${subject.trim()}`);
+      if (result && (result as any).id) {
+        console.log(`[Email] Resend id: ${(result as any).id}`);
+      }
+
+      res.json({ success: true, fromEmailUsed: fromEmail, result });
+    } catch (error: any) {
+      const status = error?.status || error?.statusCode || 500;
+      res.status(status).json({ message: error?.message || 'Gagal mengirim email' });
+    }
+  });
+
   app.put('/api/admin/members/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -1155,6 +1337,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
+      // Prevent deletion if member still has an active membership
+      try {
+        const m = await storage.getUserMembership(id);
+        if (m && (m as any).status === 'active') {
+          return res.status(409).json({ message: 'Tidak dapat menghapus member dengan status membership aktif. Batalkan atau tunggu membership berakhir terlebih dahulu.' });
+        }
+      } catch (_) {
+        // If membership lookup fails, continue to safe path (delete may still be allowed)
+      }
       await storage.deleteUser(id);
       res.json({ message: 'Member deleted successfully' });
     } catch (error) {
@@ -1538,10 +1729,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check membership status
+      // Check membership status & account active
       const membership = await storage.getUserMembership(memberUser.id);
       const now = new Date();
       const hasActiveMembership = membership && new Date(membership.endDate) > now;
+
+      if (memberUser.active === false) {
+        return res.json({
+          success: false,
+          user: memberUser,
+          membership,
+          message: 'Akun sedang CUTI. Silakan aktifkan kembali untuk melakukan check-in.'
+        });
+      }
 
       // If no active membership, return failure response with member info
       if (!hasActiveMembership) {
@@ -1549,7 +1749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: false,
           user: memberUser,
           membership,
-          message: 'Belum terdaftar membership atau membership sudah expired'
+          message: 'Belum terdaftar membership aktif atau membership sudah expired'
         });
       }
 
@@ -1596,6 +1796,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Check-in preview (no creation) — returns member info only
+  app.post('/api/admin/checkin/preview', isAuthenticated, async (req: any, res) => {
+    try {
+      const { qrCode } = req.body;
+      if (!qrCode) {
+        return res.status(400).json({ success: false, message: 'QR code is required' });
+      }
+
+      const now = new Date();
+      let memberUser = await storage.getUserByPermanentQrCode(qrCode);
+      let isOneTimeQr = false;
+      let normalizedQr = qrCode;
+
+      if (!memberUser) {
+        const oneTimeQr = await storage.validateOneTimeQrCode(qrCode);
+        if (oneTimeQr) {
+          if (oneTimeQr.status === 'used') {
+            return res.status(400).json({ success: false, message: 'QR code sudah pernah digunakan' });
+          }
+          if (oneTimeQr.status === 'expired' || oneTimeQr.expiresAt < now) {
+            return res.status(400).json({ success: false, message: 'QR code sudah kadaluarsa. Silakan generate QR baru' });
+          }
+          memberUser = await storage.getUser(oneTimeQr.userId);
+          isOneTimeQr = true;
+          normalizedQr = qrCode;
+        }
+      }
+
+      if (!memberUser) {
+        return res.status(404).json({ success: false, message: 'QR code tidak valid atau member tidak ditemukan' });
+      }
+
+      // Check membership & CUTI
+      const membership = await storage.getUserMembership(memberUser.id);
+      if (!membership || new Date(membership.endDate) <= now || membership.status !== 'active') {
+        return res.status(400).json({ success: false, message: 'Membership tidak aktif' });
+      }
+
+      // Optional: handle special user states like leave/pause if implemented in the future
+      // Enrich preview with last check-in info
+      let lastCheckIn: any = null;
+      try {
+        const recent = await storage.getUserCheckIns(memberUser.id, 1);
+        lastCheckIn = recent && recent.length > 0 ? recent[0] : null;
+      } catch {}
+
+      return res.json({
+        success: true,
+        user: memberUser,
+        membership,
+        isOneTimeQr,
+        qrCode: normalizedQr,
+        lastCheckIn,
+      });
+    } catch (error) {
+      console.error("Error in admin check-in preview:", error);
+      res.status(500).json({ success: false, message: 'Failed to preview check-in' });
+    }
+  });
+
+  // Admin Check-in approve (creates the check-in with optional lockerNumber)
+  app.post('/api/admin/checkin/approve', isAuthenticated, async (req: any, res) => {
+    try {
+      const { qrCode, lockerNumber } = req.body as { qrCode?: string; lockerNumber?: string };
+      if (!qrCode) {
+        return res.status(400).json({ success: false, message: 'QR code is required' });
+      }
+
+      const now = new Date();
+      let memberUser = await storage.getUserByPermanentQrCode(qrCode);
+      let isOneTimeQr = false;
+
+      if (!memberUser) {
+        const oneTimeQr = await storage.validateOneTimeQrCode(qrCode);
+        if (!oneTimeQr) {
+          return res.status(404).json({ success: false, message: 'QR code tidak valid' });
+        }
+        if (oneTimeQr.status === 'used') {
+          return res.status(400).json({ success: false, message: 'QR code sudah pernah digunakan' });
+        }
+        if (oneTimeQr.status === 'expired' || oneTimeQr.expiresAt < now) {
+          return res.status(400).json({ success: false, message: 'QR code sudah kadaluarsa. Silakan generate QR baru' });
+        }
+        memberUser = await storage.getUser(oneTimeQr.userId);
+        isOneTimeQr = true;
+      }
+
+      if (!memberUser) {
+        return res.status(404).json({ success: false, message: 'Member tidak ditemukan' });
+      }
+
+      // Validate membership & CUTI
+      const membership = await storage.getUserMembership(memberUser.id);
+      if (!membership || new Date(membership.endDate) <= now || membership.status !== 'active') {
+        return res.status(400).json({ success: false, message: 'Membership tidak aktif' });
+      }
+      // Optional: handle special user states like leave/pause if implemented in the future
+
+      // Check if user already has an active check-in
+      const existing = await storage.getUserCheckIns(memberUser.id, 1);
+      const hasActive = existing[0] && existing[0].status === 'active';
+      let created;
+      if (hasActive) {
+        // Already active: just return the existing, optionally in the future could update locker
+        created = existing[0];
+      } else {
+        const checkInQr = randomUUID();
+        created = await storage.createCheckIn({
+          userId: memberUser.id,
+          qrCode: checkInQr,
+          status: 'active',
+          lockerNumber: lockerNumber || null as any,
+        } as any);
+      }
+
+      // Mark one-time QR as used after successful creation
+      if (isOneTimeQr) {
+        try {
+          await storage.markQrCodeAsUsed(qrCode);
+        } catch (err) {
+          console.error('[Admin Check-in] Warning: Could not mark QR as used:', err);
+        }
+      }
+
+      return res.json({
+        success: true,
+        checkIn: created,
+        user: memberUser,
+        membership,
+      });
+    } catch (error) {
+      console.error('Error approving check-in:', error);
+      res.status(500).json({ success: false, message: 'Failed to approve check-in' });
+    }
+  });
+
   app.get('/api/admin/checkins', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -1632,6 +1968,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error running auto-checkout:", error);
       res.status(500).json({ message: "Failed to run auto-checkout" });
+    }
+  });
+
+  // Promotions (member-visible) with simple ETag caching
+  app.get('/api/member/promotions', isAuthenticated, async (req: any, res) => {
+    try {
+      const promos = await storage.getActivePromotions();
+      const body = JSON.stringify(promos);
+      // Weak ETag based on body hash (use sha256 to avoid environments where sha1 may be disabled/FIPS)
+      let etag: string | undefined;
+      try {
+        etag = 'W/"' + createHash('sha256').update(body).digest('base64') + '"';
+      } catch (e) {
+        console.warn('ETag generation failed, continuing without ETag:', e);
+      }
+
+      if (etag) {
+        const ifNoneMatch = req.headers['if-none-match'];
+        if (ifNoneMatch && ifNoneMatch === etag) {
+          res.status(304).end();
+          return;
+        }
+        res.setHeader('ETag', etag);
+      }
+
+      // Cache for 60s on client; allow intermediaries to cache safely
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      res.json(promos);
+    } catch (error) {
+      console.error('Error fetching member promotions:', error);
+      res.status(500).json({ message: 'Failed to fetch promotions' });
+    }
+  });
+
+  // Admin Promotions CRUD
+  app.get('/api/admin/promotions', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (user?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+      const promos = await storage.getAllPromotions();
+      // Admin view also sends caching hints, but no 304 to avoid staleness while editing
+      res.setHeader('Cache-Control', 'private, max-age=30');
+      res.json(promos);
+    } catch (error) {
+      console.error('Error fetching promotions:', error);
+      res.status(500).json({ message: 'Failed to fetch promotions' });
+    }
+  });
+
+  app.post('/api/admin/promotions', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (user?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+      const payload = insertPromotionSchema.partial({
+        startsAt: true,
+        endsAt: true,
+        imageUrl: true,
+        cta: true,
+        ctaHref: true,
+        sortOrder: true,
+        isActive: true,
+      }).required({ title: true }).parse(req.body);
+      const created = await storage.createPromotion(payload as any);
+      res.json(created);
+    } catch (error: any) {
+      console.error('Error creating promotion:', error);
+      res.status(400).json({ message: error.message || 'Failed to create promotion' });
+    }
+  });
+
+  app.put('/api/admin/promotions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (user?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+      const id = req.params.id as string;
+      const payload = insertPromotionSchema.partial().parse(req.body);
+      await storage.updatePromotion(id, payload as any);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error updating promotion:', error);
+      res.status(400).json({ message: error.message || 'Failed to update promotion' });
+    }
+  });
+
+  app.delete('/api/admin/promotions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (user?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+      const id = req.params.id as string;
+      await storage.deletePromotion(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting promotion:', error);
+      res.status(500).json({ message: 'Failed to delete promotion' });
     }
   });
 
@@ -2306,368 +2736,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching inactive members:", error);
       res.status(500).json({ message: "Failed to fetch inactive members" });
-    }
-  });
-
-  // Indonesian Payment Gateway Routes
-  
-  // QRIS Payment
-  app.post('/api/payment/qris', isAuthenticated, async (req: any, res) => {
-    try {
-      if (!midtransCore) {
-        return res.status(501).json({ 
-          message: 'Payment gateway belum dikonfigurasi. Hubungi administrator.' 
-        });
-      }
-
-      // Validate input
-      const qrisPaymentSchema = z.object({
-        planId: z.string().min(1, 'Plan ID diperlukan'),
-      });
-
-      const validatedData = qrisPaymentSchema.parse(req.body);
-      const { planId } = validatedData;
-
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
-
-      if (!user?.email) {
-        return res.status(400).json({ message: 'Email user diperlukan' });
-      }
-
-      // Get membership plan
-      const plans = await storage.getMembershipPlans();
-      const plan = plans.find(p => p.id === planId);
-      if (!plan) {
-        return res.status(400).json({ message: 'Paket membership tidak valid' });
-      }
-
-      const orderId = `gym-${userId}-${Date.now()}`;
-      const parameter = {
-        payment_type: 'qris',
-        transaction_details: {
-          order_id: orderId,
-          gross_amount: parseInt(plan.price),
-        },
-        qris: {
-          acquirer: 'gopay'
-        },
-        customer_details: {
-          first_name: user.firstName || 'Member',
-          last_name: user.lastName || 'Gym',
-          email: user.email,
-        },
-        item_details: [{
-          id: plan.id,
-          price: parseInt(plan.price),
-          quantity: 1,
-          name: `Membership ${plan.name}`,
-          category: 'Gym Membership'
-        }]
-      };
-
-      const qrisTransaction = await midtransCore.charge(parameter);
-      
-      // Create payment record with proper reconciliation fields
-      const paymentRecord = await storage.createPayment({
-        userId,
-        amount: plan.price,
-        currency: 'IDR',
-        status: 'pending',
-        description: `${orderId} - Membership ${plan.name} - QRIS`,
-        stripePaymentIntentId: qrisTransaction.transaction_id, // Store Midtrans transaction ID
-      });
-
-      res.json({
-        orderId,
-        qrString: qrisTransaction.qr_string,
-        transactionId: qrisTransaction.transaction_id,
-        transactionStatus: qrisTransaction.transaction_status,
-        paymentId: paymentRecord.id,
-        message: 'Scan QR Code untuk melakukan pembayaran'
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: 'Data input tidak valid', 
-          errors: error.errors 
-        });
-      }
-      console.error("Error creating QRIS payment:", error);
-      res.status(500).json({ message: "Gagal membuat pembayaran QRIS" });
-    }
-  });
-
-  // Virtual Account Payment
-  app.post('/api/payment/va', isAuthenticated, async (req: any, res) => {
-    try {
-      if (!midtransCore) {
-        return res.status(501).json({ 
-          message: 'Payment gateway belum dikonfigurasi. Hubungi administrator.' 
-        });
-      }
-
-      // Validate input
-      const vaPaymentSchema = z.object({
-        planId: z.string().min(1, 'Plan ID diperlukan'),
-        bankCode: z.enum(['bca', 'bni', 'bri', 'mandiri', 'permata'], {
-          errorMap: () => ({ message: 'Bank tidak didukung' })
-        }),
-      });
-
-      const validatedData = vaPaymentSchema.parse(req.body);
-      const { planId, bankCode } = validatedData;
-
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
-
-      if (!user?.email) {
-        return res.status(400).json({ message: 'Email user diperlukan' });
-      }
-
-      // Get membership plan
-      const plans = await storage.getMembershipPlans();
-      const plan = plans.find(p => p.id === planId);
-      if (!plan) {
-        return res.status(400).json({ message: 'Paket membership tidak valid' });
-      }
-
-      const orderId = `gym-va-${userId}-${Date.now()}`;
-      
-      // Different parameter structure for different banks
-      let parameter: any = {
-        transaction_details: {
-          order_id: orderId,
-          gross_amount: parseInt(plan.price),
-        },
-        customer_details: {
-          first_name: user.firstName || 'Member',
-          last_name: user.lastName || 'Gym',
-          email: user.email,
-        },
-        item_details: [{
-          id: plan.id,
-          price: parseInt(plan.price),
-          quantity: 1,
-          name: `Membership ${plan.name}`,
-          category: 'Gym Membership'
-        }]
-      };
-
-      // Handle different bank requirements
-      if (bankCode === 'mandiri') {
-        parameter.payment_type = 'echannel';
-        parameter.echannel = {
-          bill_info1: `Membership ${plan.name}`,
-          bill_info2: `Gym Idachi Fitness`
-        };
-      } else {
-        parameter.payment_type = 'bank_transfer';
-        parameter.bank_transfer = {
-          bank: bankCode
-        };
-      }
-
-      const vaTransaction = await midtransCore.charge(parameter);
-      
-      // Extract VA number based on bank
-      let vaNumber: string = '';
-      let expiry: string = '';
-      
-      if (bankCode === 'mandiri') {
-        vaNumber = vaTransaction.bill_key || '';
-        expiry = vaTransaction.biller_code || '';
-      } else if (bankCode === 'permata') {
-        vaNumber = vaTransaction.permata_va_number || '';
-      } else {
-        vaNumber = vaTransaction.va_numbers?.[0]?.va_number || '';
-        if (vaTransaction.va_numbers?.[0]) {
-          expiry = vaTransaction.va_numbers[0].expiry_date || '';
-        }
-      }
-      
-      // Create payment record with proper reconciliation fields
-      const paymentRecord = await storage.createPayment({
-        userId,
-        amount: plan.price,
-        currency: 'IDR',
-        status: 'pending',
-        description: `${orderId} - Membership ${plan.name} - VA ${bankCode.toUpperCase()}`,
-        stripePaymentIntentId: vaTransaction.transaction_id, // Store Midtrans transaction ID
-      });
-
-      res.json({
-        orderId,
-        vaNumber,
-        bank: bankCode.toUpperCase(),
-        expiry,
-        transactionId: vaTransaction.transaction_id,
-        transactionStatus: vaTransaction.transaction_status,
-        paymentId: paymentRecord.id,
-        message: `Transfer ke Virtual Account ${bankCode.toUpperCase()}`,
-        instructions: `Transfer sejumlah Rp ${parseInt(plan.price).toLocaleString('id-ID')} ke nomor VA: ${vaNumber}`
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: 'Data input tidak valid', 
-          errors: error.errors 
-        });
-      }
-      console.error("Error creating VA payment:", error);
-      res.status(500).json({ message: "Gagal membuat Virtual Account" });
-    }
-  });
-
-  // Payment status check endpoint
-  app.get('/api/payment/status/:orderId', isAuthenticated, async (req: any, res) => {
-    try {
-      const { orderId } = req.params;
-      const userId = req.user.id;
-      
-      // Verify the order belongs to this user by checking the order format
-      // Format: gym-${userId}-${timestamp} or gym-va-${userId}-${timestamp}
-      const orderParts = orderId.split('-');
-      const isGymFormat = orderParts[0] === 'gym' && orderParts[1] !== 'va';
-      const isGymVaFormat = orderParts[0] === 'gym' && orderParts[1] === 'va';
-      
-      let orderUserId = '';
-      if (isGymFormat && orderParts.length >= 3) {
-        orderUserId = orderParts[1];
-      } else if (isGymVaFormat && orderParts.length >= 4) {
-        orderUserId = orderParts[2];
-      }
-      
-      if (!orderUserId || orderUserId !== userId) {
-        return res.status(403).json({ message: 'Unauthorized access to payment status' });
-      }
-
-      // Get payment by description (which contains the order ID)
-      const payment = await storage.getPaymentByOrderId(orderId);
-      
-      if (!payment) {
-        return res.status(404).json({ message: 'Payment not found' });
-      }
-
-      res.json({
-        orderId,
-        status: payment.status,
-        amount: payment.amount,
-        currency: payment.currency,
-        transactionId: payment.stripePaymentIntentId
-      });
-    } catch (error) {
-      console.error("Error checking payment status:", error);
-      res.status(500).json({ message: "Failed to check payment status" });
-    }
-  });
-
-  // Payment notification webhook (for Midtrans)
-  app.post('/api/payment/midtrans/notify', async (req, res) => {
-    try {
-      if (!midtransCore) {
-        return res.status(501).json({ message: 'Payment gateway not configured' });
-      }
-
-      const notificationJson = req.body;
-      
-      // Verify signature for security
-      const orderId = notificationJson.order_id;
-      const statusCode = notificationJson.status_code;
-      const grossAmount = notificationJson.gross_amount;
-      const serverKey = process.env.MIDTRANS_SERVER_KEY;
-      
-      if (!serverKey) {
-        console.error("Missing Midtrans server key for signature verification");
-        return res.status(500).json({ message: "Server configuration error" });
-      }
-
-      // Create signature hash
-      const crypto = require('crypto');
-      const signatureKey = orderId + statusCode + grossAmount + serverKey;
-      const signature = crypto.createHash('sha512').update(signatureKey).digest('hex');
-      
-      if (signature !== notificationJson.signature_key) {
-        console.error(`Invalid signature for order ${orderId}`);
-        return res.status(401).json({ message: "Invalid signature" });
-      }
-
-      const statusResponse = await midtransCore.transaction.notification(notificationJson);
-      
-      const transactionStatus = statusResponse.transaction_status;
-      const fraudStatus = statusResponse.fraud_status;
-      const transactionId = statusResponse.transaction_id;
-
-      console.log(`Transaction notification received. Order ID: ${orderId}. Transaction status: ${transactionStatus}. Fraud status: ${fraudStatus}`);
-
-      // Find payment record by order ID (extract user ID from order ID format)
-      // Format: gym-${userId}-${timestamp} or gym-va-${userId}-${timestamp}
-      const orderParts = orderId.split('-');
-      let userId: string | null = null;
-      
-      const isGymFormat = orderParts[0] === 'gym' && orderParts[1] !== 'va';
-      const isGymVaFormat = orderParts[0] === 'gym' && orderParts[1] === 'va';
-      
-      if (isGymFormat && orderParts.length >= 3) {
-        userId = orderParts[1];
-      } else if (isGymVaFormat && orderParts.length >= 4) {
-        userId = orderParts[2];
-      }
-
-      if (!userId) {
-        console.error(`Could not extract user ID from order ID: ${orderId}`);
-        return res.status(400).json({ message: "Invalid order ID format" });
-      }
-
-      // Update payment status based on transaction status
-      let paymentStatus = 'pending';
-      let shouldActivateMembership = false;
-
-      if (transactionStatus === 'capture') {
-        if (fraudStatus === 'challenge') {
-          paymentStatus = 'challenged';
-        } else if (fraudStatus === 'accept') {
-          paymentStatus = 'completed';
-          shouldActivateMembership = true;
-        }
-      } else if (transactionStatus === 'settlement') {
-        paymentStatus = 'completed';
-        shouldActivateMembership = true;
-      } else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
-        paymentStatus = 'failed';
-      } else if (transactionStatus === 'pending') {
-        paymentStatus = 'pending';
-      }
-
-      // Update payment record with transaction details
-      await storage.updatePaymentStatus(transactionId, paymentStatus);
-
-      // If payment is successful, activate membership
-      if (shouldActivateMembership) {
-        try {
-          // Extract plan ID from the order or get from most recent pending payment for this user
-          const userPayments = await storage.getUserPayments(userId);
-          const pendingPayment = userPayments.find(p => p.status === 'pending' || p.status === 'completed');
-          
-          if (pendingPayment?.membershipId) {
-            // Update existing membership status to active
-            await storage.updateMembershipStatus(pendingPayment.membershipId, 'active');
-          } else {
-            // Create new membership based on payment
-            // This would need to be enhanced to extract plan info from payment description
-            console.log(`Payment successful for user ${userId}, but no membership plan found to activate`);
-          }
-          
-          console.log(`Membership activated for user ${userId} after successful payment`);
-        } catch (error) {
-          console.error(`Error activating membership for user ${userId}:`, error);
-        }
-      }
-
-      res.status(200).json({ message: 'OK' });
-    } catch (error) {
-      console.error("Error handling payment notification:", error);
-      res.status(500).json({ message: "Failed to handle notification" });
     }
   });
 

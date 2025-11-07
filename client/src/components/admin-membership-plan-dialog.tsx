@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { X } from "lucide-react";
-import type { MembershipPlan } from "@shared/schema";
+import type { MembershipPlan } from "@shared/schema.ts";
 
 const membershipPlanSchema = z.object({
   name: z.string().min(1, "Nama paket diperlukan"),

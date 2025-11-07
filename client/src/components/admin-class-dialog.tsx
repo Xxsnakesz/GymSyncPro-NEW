@@ -11,11 +11,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
-import type { GymClass } from "@shared/schema";
+import type { GymClass } from "@shared/schema.ts";
+import { useRef, useState as useReactState } from "react";
 
 const classSchema = z.object({
   name: z.string().min(1, "Nama class diperlukan"),
   description: z.string().optional(),
+  imageUrl: z.string().url("Masukkan URL gambar yang valid").optional().or(z.literal("")),
   instructorName: z.string().min(1, "Nama instruktur diperlukan"),
   schedule: z.string().min(1, "Jadwal diperlukan"),
   maxCapacity: z.string().min(1, "Kapasitas maksimum diperlukan"),
@@ -32,12 +34,16 @@ interface AdminClassDialogProps {
 export default function AdminClassDialog({ open, onOpenChange, gymClass }: AdminClassDialogProps) {
   const { toast } = useToast();
   const isEditing = !!gymClass;
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useReactState(false);
+  const [preview, setPreview] = useReactState<string | undefined>(undefined);
 
   const form = useForm<ClassFormData>({
     resolver: zodResolver(classSchema),
     defaultValues: {
       name: "",
       description: "",
+      imageUrl: "",
       instructorName: "",
       schedule: "",
       maxCapacity: "",
@@ -49,6 +55,7 @@ export default function AdminClassDialog({ open, onOpenChange, gymClass }: Admin
       form.reset({
         name: gymClass.name || "",
         description: gymClass.description || "",
+        imageUrl: (gymClass as any).imageUrl || "",
         instructorName: gymClass.instructorName || "",
         schedule: gymClass.schedule || "",
         maxCapacity: gymClass.maxCapacity?.toString() || "",
@@ -57,6 +64,7 @@ export default function AdminClassDialog({ open, onOpenChange, gymClass }: Admin
       form.reset({
         name: "",
         description: "",
+        imageUrl: "",
         instructorName: "",
         schedule: "",
         maxCapacity: "",
@@ -68,6 +76,7 @@ export default function AdminClassDialog({ open, onOpenChange, gymClass }: Admin
     mutationFn: async (data: ClassFormData) => {
       const payload = {
         ...data,
+        imageUrl: data.imageUrl || undefined,
         maxCapacity: parseInt(data.maxCapacity),
         currentEnrollment: 0,
         active: true,
@@ -97,6 +106,7 @@ export default function AdminClassDialog({ open, onOpenChange, gymClass }: Admin
     mutationFn: async (data: ClassFormData) => {
       const payload = {
         ...data,
+        imageUrl: data.imageUrl || undefined,
         maxCapacity: parseInt(data.maxCapacity),
       };
       return await apiRequest("PUT", `/api/admin/classes/${gymClass?.id}`, payload);
@@ -127,6 +137,33 @@ export default function AdminClassDialog({ open, onOpenChange, gymClass }: Admin
     }
   };
 
+  const handlePickFile = () => fileInputRef.current?.click();
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Format tidak didukung', description: 'Pilih file gambar (PNG/JPG/WEBP).', variant: 'destructive' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setPreview(dataUrl);
+      try {
+        setUploading(true);
+        const res = await apiRequest('POST', '/api/admin/upload-image', { dataUrl });
+        const json = await res.json();
+        form.setValue('imageUrl', json.url, { shouldDirty: true });
+        toast({ title: 'Gambar terunggah', description: 'Poster berhasil diunggah.' });
+      } catch (err: any) {
+        toast({ title: 'Gagal unggah', description: err?.message || 'Tidak bisa mengunggah gambar', variant: 'destructive' });
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -139,6 +176,26 @@ export default function AdminClassDialog({ open, onOpenChange, gymClass }: Admin
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Poster uploader */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Poster/Gambar</span>
+                  <span className="text-xs text-muted-foreground">Upload file gambar untuk poster class</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={handlePickFile} disabled={uploading}>
+                  {uploading ? 'Mengunggah…' : 'Pilih Gambar'}
+                </Button>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFileChange} />
+              {(preview || form.watch('imageUrl')) && (
+                <div className="aspect-[16/9] w-full overflow-hidden rounded-md border border-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview || form.watch('imageUrl')!} alt="Poster" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="name"

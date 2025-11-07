@@ -78,6 +78,7 @@ export const gymClasses = pgTable("gym_classes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
+  imageUrl: varchar("image_url"),
   instructorName: varchar("instructor_name").notNull(),
   schedule: varchar("schedule").notNull(), // e.g., "Mon, Wed, Fri - 7:00 AM"
   maxCapacity: integer("max_capacity").notNull(),
@@ -103,6 +104,7 @@ export const checkIns = pgTable("check_ins", {
   checkInTime: timestamp("check_in_time").defaultNow(),
   checkOutTime: timestamp("check_out_time"),
   qrCode: varchar("qr_code").notNull(),
+  lockerNumber: varchar("locker_number"),
   status: varchar("status").default("active"), // active, completed
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -242,6 +244,22 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   auth: text("auth").notNull(),
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Promotions (admin-managed, shown to members)
+export const promotions = pgTable("promotions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  imageUrl: varchar("image_url"),
+  cta: varchar("cta"),
+  ctaHref: varchar("cta_href"),
+  startsAt: timestamp("starts_at"),
+  endsAt: timestamp("ends_at"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Relations
@@ -387,6 +405,8 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
   }),
 }));
 
+// No complex relations needed for promotions currently
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -505,6 +525,12 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
   createdAt: true,
 });
 
+export const insertPromotionSchema = createInsertSchema(promotions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Forgot password schemas
 export const forgotPasswordRequestSchema = z.object({
   email: z.string().email("Email tidak valid"),
@@ -577,6 +603,8 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
 export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequestSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;

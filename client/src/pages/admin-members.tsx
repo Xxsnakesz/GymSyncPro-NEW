@@ -11,8 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import AdminLayout from "@/components/ui/admin-layout";
 import AdminMemberDialog from "@/components/admin-member-dialog";
 import AdminEditMemberDialog from "@/components/admin-edit-member-dialog";
+import AdminWhatsappDialog from "@/components/admin-whatsapp-dialog";
+import AdminEmailDialog from "@/components/admin-email-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { UserPlus, Edit, Trash2, UserX, UserCheck, Search, Activity } from "lucide-react";
+import { UserPlus, Search, Activity, Eye } from "lucide-react";
+import MemberDetailSheet from "@/components/admin-member-detail-sheet";
 import { format } from "date-fns";
 
 interface MemberWithMembership {
@@ -42,6 +45,9 @@ export default function AdminMembers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showMemberDialog, setShowMemberDialog] = useState(false);
   const [showEditMemberDialog, setShowEditMemberDialog] = useState(false);
+  const [showWhatsappDialog, setShowWhatsappDialog] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberWithMembership | null>(null);
 
   useEffect(() => {
@@ -201,6 +207,21 @@ export default function AdminMembers() {
     activateMutation.mutate(memberId);
   };
 
+  const handleWhatsapp = (member: MemberWithMembership) => {
+    setSelectedMember(member);
+    setShowWhatsappDialog(true);
+  };
+
+  const handleEmail = (member: MemberWithMembership) => {
+    setSelectedMember(member);
+    setShowEmailDialog(true);
+  };
+
+  const handleDetail = (member: MemberWithMembership) => {
+    setSelectedMember(member);
+    setShowDetail(true);
+  };
+
   return (
     <AdminLayout user={user} notificationCount={stats.expiringSoon || 0}>
       <div className="space-y-6">
@@ -267,12 +288,6 @@ export default function AdminMembers() {
                         Member
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                        Username
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                        Phone
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                         Membership
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
@@ -285,7 +300,7 @@ export default function AdminMembers() {
                         Inactive Days
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
-                        Actions
+                        Detail
                       </th>
                     </tr>
                   </thead>
@@ -307,19 +322,12 @@ export default function AdminMembers() {
                                 </p>
                                 {member.active === false && (
                                   <Badge variant="outline" className="text-orange-600 border-orange-600">
-                                    Suspended
+                                    Cuti
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-sm text-muted-foreground">{member.email}</p>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-foreground">
-                          {member.username || '-'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-foreground">
-                          {member.phone || '-'}
                         </td>
                         <td className="px-6 py-4 text-sm text-foreground">
                           {member.membership?.plan?.name || 'No Plan'}
@@ -351,43 +359,9 @@ export default function AdminMembers() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditMember(member)}
-                              data-testid={`button-edit-${member.id}`}
-                            >
-                              <Edit size={16} />
-                            </Button>
-                            {member.active !== false ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSuspendMember(member.id)}
-                                data-testid={`button-suspend-${member.id}`}
-                              >
-                                <UserX size={16} className="text-orange-600" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleActivateMember(member.id)}
-                                data-testid={`button-activate-${member.id}`}
-                              >
-                                <UserCheck size={16} className="text-green-600" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteMember(member.id)}
-                              data-testid={`button-delete-${member.id}`}
-                            >
-                              <Trash2 size={16} className="text-destructive" />
-                            </Button>
-                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleDetail(member)} data-testid={`button-detail-${member.id}`}>
+                            <Eye size={16} className="mr-1" /> Detail
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -411,6 +385,23 @@ export default function AdminMembers() {
         onOpenChange={setShowEditMemberDialog}
         member={selectedMember}
       />
+
+      {/* WhatsApp Dialog */}
+      <AdminWhatsappDialog
+        open={showWhatsappDialog}
+        onOpenChange={setShowWhatsappDialog}
+        member={selectedMember}
+      />
+
+      {/* Email Dialog */}
+      <AdminEmailDialog
+        open={showEmailDialog}
+        onOpenChange={setShowEmailDialog}
+        member={selectedMember}
+      />
+
+      {/* Member Detail Sheet */}
+      <MemberDetailSheet open={showDetail} onOpenChange={setShowDetail} member={selectedMember} />
     </AdminLayout>
   );
 }

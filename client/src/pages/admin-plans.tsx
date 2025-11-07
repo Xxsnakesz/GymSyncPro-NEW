@@ -9,7 +9,7 @@ import AdminLayout from "@/components/ui/admin-layout";
 import AdminMembershipPlanDialog from "@/components/admin-membership-plan-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Edit, Trash2, Check, DollarSign, Calendar } from "lucide-react";
-import type { MembershipPlan } from "@shared/schema";
+import type { MembershipPlan } from "@shared/schema.ts";
 
 export default function AdminPlans() {
   const { toast } = useToast();
@@ -142,7 +142,7 @@ export default function AdminPlans() {
                     {plan.description || "No description"}
                   </p>
 
-                  {plan.features && Array.isArray(plan.features) && plan.features.length > 0 && (
+                  {Array.isArray(plan.features) && (plan.features as string[]).length > 0 && (
                     <div className="space-y-2 py-2">
                       {(plan.features as string[]).slice(0, 4).map((feature: string, idx: number) => (
                         <div key={idx} className="flex items-start gap-2">
