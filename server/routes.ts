@@ -1,6 +1,5 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import Stripe from "stripe";
 import passport from "passport";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
@@ -29,13 +28,7 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Make Stripe optional - can be added later
-let stripe: Stripe | null = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-08-27.basil",
-  });
-}
+// Payment gateway removed: Stripe integration disabled
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1003,84 +996,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
-    try {
-      if (!stripe) {
-        return res.status(501).json({ 
-          message: 'Payment gateway not configured. Please contact administrator.' 
-        });
-      }
-
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
-      const { planId } = req.body;
-
-      if (!user?.email) {
-        return res.status(400).json({ message: 'User email required' });
-      }
-
-      let customerId = user.stripeCustomerId;
-
-      // Create Stripe customer if doesn't exist
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        });
-        customerId = customer.id;
-      }
-
-      // Get membership plan
-      const plans = await storage.getMembershipPlans();
-      const plan = plans.find(p => p.id === planId);
-      if (!plan || !plan.stripePriceId) {
-        return res.status(400).json({ message: 'Invalid membership plan' });
-      }
-
-      // Create subscription
-      const subscription = await stripe.subscriptions.create({
-        customer: customerId,
-        items: [{ price: plan.stripePriceId }],
-        payment_behavior: 'default_incomplete',
-        expand: ['latest_invoice.payment_intent'],
-      });
-
-      // Update user with Stripe info
-      await storage.updateUserStripeInfo(userId, customerId, subscription.id);
-
-      // Create membership record
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + plan.durationMonths);
-
-      await storage.createMembership({
-        userId,
-        planId,
-        startDate,
-        endDate,
-        status: 'active',
-        autoRenewal: true,
-      });
-
-      const invoice = subscription.latest_invoice as Stripe.Invoice & {
-        payment_intent?: Stripe.PaymentIntent | string;
-      };
-      const paymentIntent = typeof invoice.payment_intent === 'string' 
-        ? null 
-        : invoice.payment_intent;
-      
-      if (!paymentIntent?.client_secret) {
-        throw new Error('No payment intent found');
-      }
-
-      res.json({
-        subscriptionId: subscription.id,
-        clientSecret: paymentIntent.client_secret,
-      });
-    } catch (error) {
-      console.error("Error creating subscription:", error);
-      res.status(500).json({ message: "Failed to create subscription" });
-    }
+  // Payment gateway removed: disable subscription creation endpoint
+  app.post('/api/create-subscription', isAuthenticated, async (_req: any, res) => {
+    return res.status(501).json({ message: 'Payment gateway is disabled.' });
   });
 
   // Admin routes

@@ -64,8 +64,8 @@ export default function AdminEmailDialog({ open, onOpenChange, member }: AdminEm
         subject: "Pengingat: Membership kamu segera berakhir",
         message:
           `Halo ${fullName},\n\nKami ingin mengingatkan bahwa masa aktif membership kamu akan segera berakhir. Supaya aksesmu ke kelas dan fasilitas tidak terputus, yuk perpanjang sekarang.\n\nDengan perpanjangan lebih awal, kamu tetap bisa:\n• Booking kelas tanpa hambatan\n• Mengakses seluruh fasilitas klub\n• Menjaga konsistensi progress latihannya\n\nKalau butuh rekomendasi paket, balas saja email ini ya.`,
-        ctaText: "Perpanjang Membership",
-        ctaPath: "/checkout",
+  ctaText: "Perpanjang Membership",
+  ctaPath: "/my-profile",
       }),
     },
     {
@@ -75,8 +75,8 @@ export default function AdminEmailDialog({ open, onOpenChange, member }: AdminEm
         subject: "Membership kamu telah berakhir",
         message:
           `Halo ${fullName},\n\nMembership kamu saat ini telah berakhir. Kami berharap bisa segera menyambutmu kembali di klub.\n\nAyo aktifkan lagi untuk melanjutkan progress latihan dan akses penuh ke kelas serta fasilitas Idachi Fitness. Jika kamu butuh bantuan memilih paket, tim kami siap bantu.`,
-        ctaText: "Aktifkan Kembali",
-        ctaPath: "/checkout",
+  ctaText: "Aktifkan Kembali",
+  ctaPath: "/my-profile",
       }),
     },
     {

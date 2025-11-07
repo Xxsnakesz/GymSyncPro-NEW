@@ -25,7 +25,6 @@ const AdminPTBookings = lazy(() => import("@/pages/admin-pt-bookings"));
 const AdminPTSessions = lazy(() => import("@/pages/admin-pt-sessions"));
 const AdminPromotions = lazy(() => import("@/pages/admin-promotions"));
 const AdminClassBookings = lazy(() => import("@/pages/admin-class-bookings"));
-const Checkout = lazy(() => import("@/pages/checkout"));
 const MyBookings = lazy(() => import("@/pages/my-bookings"));
 const MyPtSessions = lazy(() => import("@/pages/my-pt-sessions"));
 const ClassesPage = lazy(() => import("@/pages/classes"));
@@ -83,7 +82,6 @@ function Router() {
           <Route path="/admin/pt-sessions" component={AdminPTSessions} />
           <Route path="/admin/promotions" component={AdminPromotions} />
           <Route path="/admin/class-bookings" component={AdminClassBookings} />
-          <Route path="/checkout" component={Checkout} />
           <Route path="/classes" component={ClassesPage} />
           <Route path="/book-pt" component={BookPTPage} />
           <Route path="/my-bookings" component={MyBookings} />

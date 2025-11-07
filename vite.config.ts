@@ -34,7 +34,6 @@ export default defineConfig({
             if (id.includes('date-fns')) return 'date';
             if (id.includes('recharts')) return 'charts';
             if (id.includes('html5-qrcode') || id.includes('qrcode')) return 'qr';
-            if (id.includes('stripe')) return 'stripe';
             if (id.includes('zod')) return 'zod';
             if (id.includes('lucide-react')) return 'icons';
             return 'vendor';
