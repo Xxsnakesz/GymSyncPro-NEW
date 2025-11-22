@@ -1,0 +1,325 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  sid    String   @id
+  sess   Json
+  expire DateTime
+
+  @@index([expire], name: "IDX_session_expire")
+  @@map("sessions")
+}
+
+model User {
+  id                      String    @id @default(uuid())
+  username                String    @unique
+  password                String
+  email                   String    @unique
+  firstName               String    @map("first_name")
+  lastName                String    @map("last_name")
+  phone                   String?
+  profileImageUrl         String?   @map("profile_image_url")
+  permanentQrCode         String?   @map("permanent_qr_code")
+  role                    String    @default("member") // member, admin, owner
+  active                  Boolean   @default(true)
+  emailVerified           Boolean   @default(false) @map("email_verified")
+  verificationCode        String?   @map("verification_code")
+  verificationCodeExpiry  DateTime? @map("verification_code_expiry")
+  stripeCustomerId        String?   @map("stripe_customer_id")
+  stripeSubscriptionId    String?   @map("stripe_subscription_id")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  memberships           Membership[]
+  classBookings         ClassBooking[]
+  checkIns              CheckIn[]
+  payments              Payment[]
+  feedbacks             Feedback[]
+  ptBookings            PtBooking[]
+  ptSessionPackages     PtSessionPackage[]
+  ptSessionAttendance   PtSessionAttendance[]
+  oneTimeQrCodes        OneTimeQrCode[]
+  notifications         Notification[]
+  pushSubscriptions     PushSubscription[]
+
+  @@map("users")
+}
+
+model MembershipPlan {
+  id            String       @id @default(uuid())
+  name          String
+  description   String?      @db.Text
+  price         Decimal      @db.Decimal(10, 2)
+  durationMonths Int         @map("duration_months")
+  features      Json?
+  stripePriceId String?      @map("stripe_price_id")
+  active        Boolean      @default(true)
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  memberships   Membership[]
+
+  @@map("membership_plans")
+}
+
+model Membership {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  planId      String         @map("plan_id")
+  startDate   DateTime       @map("start_date")
+  endDate     DateTime       @map("end_date")
+  status      String         @default("active") // active, expired, cancelled
+  autoRenewal Boolean        @default(true) @map("auto_renewal")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  user        User           @relation(fields: [userId], references: [id])
+  plan        MembershipPlan @relation(fields: [planId], references: [id])
+  payments    Payment[]
+
+  @@map("memberships")
+}
+
+model GymClass {
+  id              String         @id @default(uuid())
+  name            String
+  description     String?        @db.Text
+  imageUrl        String?        @map("image_url")
+  instructorName  String         @map("instructor_name")
+  schedule        String
+  maxCapacity     Int            @map("max_capacity")
+  currentEnrollment Int          @default(0) @map("current_enrollment")
+  active          Boolean        @default(true)
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  bookings        ClassBooking[]
+
+  @@map("gym_classes")
+}
+
+model ClassBooking {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  classId     String    @map("class_id")
+  bookingDate DateTime  @map("booking_date")
+  status      String    @default("booked") // booked, attended, cancelled
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id])
+  gymClass    GymClass  @relation(fields: [classId], references: [id])
+
+  @@map("class_bookings")
+}
+
+model CheckIn {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  checkInTime DateTime  @default(now()) @map("check_in_time")
+  checkOutTime DateTime? @map("check_out_time")
+  qrCode      String    @map("qr_code")
+  lockerNumber String?   @map("locker_number")
+  status      String    @default("active") // active, completed
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@map("check_ins")
+}
+
+model Payment {
+  id                  String      @id @default(uuid())
+  userId              String      @map("user_id")
+  membershipId        String?     @map("membership_id")
+  amount              Decimal     @db.Decimal(10, 2)
+  currency            String      @default("usd")
+  stripePaymentIntentId String?   @map("stripe_payment_intent_id")
+  status              String      // pending, completed, failed, refunded
+  description         String?     @db.Text
+  createdAt           DateTime    @default(now()) @map("created_at")
+
+  user                User        @relation(fields: [userId], references: [id])
+  membership          Membership? @relation(fields: [membershipId], references: [id])
+
+  @@map("payments")
+}
+
+model Feedback {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  subject      String
+  message      String    @db.Text
+  rating       Int?
+  status       String    @default("pending") // pending, reviewed, resolved
+  adminResponse String?  @db.Text @map("admin_response")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user         User      @relation(fields: [userId], references: [id])
+
+  @@map("feedbacks")
+}
+
+model PersonalTrainer {
+  id              String              @id @default(uuid())
+  name            String
+  bio             String?             @db.Text
+  specialization  String
+  experience      Int?
+  certification   String?             @db.Text
+  imageUrl        String?             @map("image_url")
+  pricePerSession Decimal             @db.Decimal(10, 2) @map("price_per_session")
+  availability    Json?
+  active          Boolean             @default(true)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  bookings        PtBooking[]
+  sessionPackages PtSessionPackage[]
+  sessionAttendance PtSessionAttendance[]
+
+  @@map("personal_trainers")
+}
+
+model PtBooking {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  trainerId   String           @map("trainer_id")
+  bookingDate DateTime         @map("booking_date")
+  duration    Int              @default(60) // minutes
+  sessionCount Int             @default(1) @map("session_count")
+  status      String           @default("pending") // pending, confirmed, completed, cancelled
+  notes       String?          @db.Text
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  user        User             @relation(fields: [userId], references: [id])
+  trainer     PersonalTrainer  @relation(fields: [trainerId], references: [id])
+
+  @@map("pt_bookings")
+}
+
+model PtSessionPackage {
+  id               String              @id @default(uuid())
+  userId           String              @map("user_id")
+  trainerId        String              @map("trainer_id")
+  totalSessions    Int                 @map("total_sessions")
+  usedSessions     Int                 @default(0) @map("used_sessions")
+  remainingSessions Int                @map("remaining_sessions")
+  pricePerSession  Decimal             @db.Decimal(10, 2) @map("price_per_session")
+  totalPrice       Decimal             @db.Decimal(10, 2) @map("total_price")
+  status           String              @default("active") // active, completed, expired
+  purchaseDate     DateTime            @default(now()) @map("purchase_date")
+  expiryDate       DateTime?           @map("expiry_date")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  user             User                @relation(fields: [userId], references: [id])
+  trainer          PersonalTrainer     @relation(fields: [trainerId], references: [id])
+  sessions         PtSessionAttendance[]
+
+  @@map("pt_session_packages")
+}
+
+model PtSessionAttendance {
+  id             String           @id @default(uuid())
+  packageId      String           @map("package_id")
+  userId         String           @map("user_id")
+  trainerId      String           @map("trainer_id")
+  sessionDate    DateTime         @map("session_date")
+  sessionNumber  Int              @map("session_number")
+  status         String           @default("scheduled") // scheduled, completed, cancelled, no_show
+  checkInTime    DateTime?        @map("check_in_time")
+  checkOutTime   DateTime?        @map("check_out_time")
+  notes          String?          @db.Text
+  adminConfirmed Boolean          @default(false) @map("admin_confirmed")
+  confirmedBy    String?          @map("confirmed_by")
+  confirmedAt    DateTime?        @map("confirmed_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  package        PtSessionPackage @relation(fields: [packageId], references: [id])
+  user           User             @relation(fields: [userId], references: [id])
+  trainer        PersonalTrainer  @relation(fields: [trainerId], references: [id])
+
+  @@map("pt_session_attendance")
+}
+
+model OneTimeQrCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  qrCode    String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  status    String    @default("valid") // valid, used, expired
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("one_time_qr_codes")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  status    String    @default("valid") // valid, used, expired
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("password_reset_tokens")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  title     String
+  message   String    @db.Text
+  type      String    // booking_confirmed, booking_cancelled, membership_expiring, etc.
+  relatedId String?   @map("related_id")
+  isRead    Boolean   @default(false) @map("is_read")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model PushSubscription {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  endpoint  String    @unique @db.Text
+  p256dh    String    @db.Text
+  auth      String    @db.Text
+  userAgent String?   @db.Text @map("user_agent")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("push_subscriptions")
+}
+
+model Promotion {
+  id        String    @id @default(uuid())
+  title     String
+  description String? @db.Text
+  imageUrl  String?   @map("image_url")
+  cta       String?
+  ctaHref   String?   @map("cta_href")
+  startsAt  DateTime? @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+  isActive  Boolean   @default(true) @map("is_active")
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("promotions")
+}
+

@@ -1,543 +1,326 @@
-# Panduan Deployment Idachi Fitness ke Server Sendiri
+# Deployment Guide
 
-Dokumen ini menjelaskan cara menjalankan aplikasi Idachi Fitness di server Anda sendiri (VPS, cloud server, atau hosting lainnya).
+This guide will help you deploy GymSyncPro to a VPS (Virtual Private Server).
 
-## 📋 Persyaratan
+## Prerequisites
 
-### Software yang Dibutuhkan
-- **Node.js** versi 18 atau lebih tinggi
-- **PostgreSQL** versi 12 atau lebih tinggi
-- **npm** atau **yarn** package manager
-- **PM2** atau process manager lainnya (opsional, untuk production)
+- VPS with Ubuntu 20.04+ or similar Linux distribution
+- Root or sudo access
+- Domain name (optional but recommended)
+- SSH access to your VPS
 
-### Layanan Eksternal
-1. **PostgreSQL Database** (wajib)
-   - Bisa menggunakan Neon, Supabase, atau self-hosted
-   
-2. **Resend API** (wajib untuk fitur email)
-   - Daftar di https://resend.com
-   - Verifikasi domain untuk production
-   
-3. **Stripe** (opsional - untuk payment internasional)
-   - Daftar di https://stripe.com
-   
-4. **Midtrans** (opsional - untuk payment Indonesia)
-   - Daftar di https://midtrans.com
+## Step 1: Server Setup
 
-## 🚀 Langkah Deployment
-
-### 1. Clone atau Upload Kode
-
-Upload semua file aplikasi ke server Anda, atau clone dari repository:
+### 1.1 Update System
 
 ```bash
-# Jika menggunakan git
-git clone <repository-url>
-cd idachi-fitness
-
-# Atau upload manual via FTP/SFTP
+sudo apt update && sudo apt upgrade -y
 ```
 
-### 2. Install Dependencies
+### 1.2 Install Docker
 
 ```bash
-npm install
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Verify installation
+docker --version
+docker-compose --version
 ```
 
-### 3. Setup Environment Variables
-
-Copy file `.env.example` menjadi `.env`:
+### 1.3 Configure Firewall
 
 ```bash
-cp .env.example .env
-```
-
-Kemudian edit file `.env` dengan nilai yang sesuai:
-
-```env
-# DATABASE (WAJIB)
-DATABASE_URL=postgresql://username:password@host:port/database
-
-# SERVER
-PORT=5000
-NODE_ENV=production
-APP_URL=https://yourdomain.com
-
-# SECURITY (WAJIB UNTUK PRODUCTION)
-SESSION_SECRET=<generate-random-string-panjang>
-
-# ADMIN
-ADMIN_SECRET_KEY=<secret-key-untuk-admin-registration>
-
-# EMAIL (WAJIB UNTUK FITUR EMAIL)
-RESEND_API_KEY=re_xxxxxxxxxxxxx
-# Default FROM (fallback jika stream khusus tidak diset)
-RESEND_FROM_EMAIL=support@adityafajrian.my.id
-
-# Stream terpisah (opsional tapi direkomendasikan):
-# 1) Admin outbound (panel admin kirim ke member)
-#    - gunakan alamat/identity berbeda (mis. support@ / hello@) dan opsional API key berbeda
-RESEND_FROM_EMAIL_ADMIN=support@adityafajrian.my.id
-RESEND_API_KEY_ADMIN=
-RESEND_REPLY_TO_ADMIN=cs@adityafajrian.my.id
-
-# 2) Verification (kode OTP/konfirmasi)
-#    - gunakan alamat/identity berbeda (mis. no-reply@) dan opsional API key berbeda
-RESEND_FROM_EMAIL_VERIFICATION=no-reply@adityafajrian.my.id
-RESEND_API_KEY_VERIFICATION=
-
-# PAYMENT (OPSIONAL)
-STRIPE_SECRET_KEY=sk_live_xxxxx
-STRIPE_PUBLIC_KEY=pk_live_xxxxx
-
-MIDTRANS_SERVER_KEY=xxxxx
-MIDTRANS_CLIENT_KEY=xxxxx
-MIDTRANS_ENVIRONMENT=production
-```
-
-#### Generate SESSION_SECRET
-
-Gunakan command berikut untuk generate random string yang aman:
-
-```bash
-openssl rand -base64 32
-```
-
-### 4. Setup Database
-
-Pastikan PostgreSQL sudah running dan buat database baru:
-
-```sql
-CREATE DATABASE idachi_fitness;
-```
-
-Kemudian jalankan migration untuk membuat tabel:
-
-```bash
-npm run db:push
-```
-
-#### Catatan: Kolom Poster Kelas (image_url)
-
-Fitur poster untuk kelas membutuhkan kolom baru `image_url` pada tabel `gym_classes`. Jika Anda meng-upgrade dari versi sebelumnya, jalankan sinkronisasi schema agar kolom tersebut dibuat:
-
-```powershell
-# Windows PowerShell contoh (Neon/Supabase/PG):
-# Pastikan sudah set DATABASE_URL di environment Anda
-$env:DATABASE_URL = "postgresql://user:pass@host:5432/dbname"; npm run db:push
-```
-
-Jika Anda menggunakan shell lain atau CI, sesuaikan cara menyetel `DATABASE_URL` sebelum menjalankan `npm run db:push`.
-
-Setelah migrasi, Admin dapat mengunggah gambar poster, dan server akan menyajikannya dari endpoint statis `/uploads/...`.
-
-### 5. Setup Email (Resend)
-
-1. Daftar di https://resend.com
-2. Buat API key di https://resend.com/api-keys
-3. Verifikasi domain Anda di https://resend.com/domains
-4. Update `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` di file `.env`
-
-> **Penting**: Untuk production, Anda harus verifikasi domain. Email dari "onboarding@resend.dev" hanya untuk development.
-
-#### Admin: Kirim Email Manual (Opsional)
-
-Jika `RESEND_API_KEY` dan `RESEND_FROM_EMAIL` sudah dikonfigurasi, Admin dapat mengirim email ke member langsung dari halaman Admin → Members. Untuk pemisahan yang rapi agar tidak "tabrakan" dengan email verifikasi, Anda dapat menyetel variabel berikut:
-
-- `RESEND_FROM_EMAIL_ADMIN` (+ opsional `RESEND_API_KEY_ADMIN`, `RESEND_REPLY_TO_ADMIN`)
-- `RESEND_FROM_EMAIL_VERIFICATION` (+ opsional `RESEND_API_KEY_VERIFICATION`)
-
-Aplikasi akan otomatis memakai stream yang sesuai: verifikasi menggunakan konfigurasi verifikasi, sedangkan email dari panel admin menggunakan konfigurasi admin.
-
-### 6. Build Aplikasi
-
-Build frontend dan backend:
-
-```bash
-npm run build
-```
-
-Ini akan menghasilkan:
-- `dist/public/` - Frontend files
-- `dist/index.js` - Backend server
-
-### 7. Jalankan Aplikasi
-
-#### Development Mode
-
-```bash
-npm run dev
-```
-
-#### Production Mode
-
-Menggunakan npm:
-
-```bash
-npm start
-```
-
-Menggunakan PM2 (recommended):
-
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start aplikasi
-pm2 start npm --name "idachi-fitness" -- start
-
-# Auto-restart on reboot
-pm2 startup
-pm2 save
-
-# Monitor logs
-pm2 logs idachi-fitness
-```
-
-### 8. Setup Web Server (Nginx)
-
-Untuk production, gunakan Nginx sebagai reverse proxy:
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-
-    location / {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Aktifkan HTTPS dengan Let's Encrypt:
-
-```bash
-sudo certbot --nginx -d yourdomain.com
-```
-
-### 9. Firewall Configuration
-
-Pastikan port yang diperlukan terbuka:
-
-```bash
-# UFW (Ubuntu)
+# Allow SSH, HTTP, and HTTPS
+sudo ufw allow OpenSSH
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
-sudo ufw allow 5432/tcp  # PostgreSQL (jika database di server yang sama)
 sudo ufw enable
 ```
 
-## 🔧 Konfigurasi Lanjutan
+## Step 2: Application Setup
 
-### WhatsApp Cloud API (Opsional)
+### 2.1 Clone Repository
 
-Jika ingin Admin dapat mengirimkan pesan WhatsApp ke member langsung dari panel admin:
+```bash
+# Navigate to a suitable directory
+cd /opt
 
-1. Daftar/aktifkan WhatsApp Cloud API di Meta for Developers.
-2. Dapatkan Phone Number ID dan Permanent Token dari Meta Business.
-3. Tambahkan environment variables berikut pada `.env`:
+# Clone the repository
+sudo git clone <your-repo-url> gymsyncpro
+cd gymsyncpro
+
+# Set ownership
+sudo chown -R $USER:$USER /opt/gymsyncpro
+```
+
+### 2.2 Configure Environment Variables
+
+```bash
+# Create .env file
+cp .env.example .env
+nano .env
+```
+
+**Required environment variables:**
 
 ```env
-WHATSAPP_TOKEN=EAAG... (permanent token)
-WHATSAPP_PHONE_NUMBER_ID=123456789012345
+# Database
+POSTGRES_USER=gymsyncpro
+POSTGRES_PASSWORD=your-secure-password-here
+POSTGRES_DB=gymsyncpro
+DATABASE_URL=postgresql://gymsyncpro:your-secure-password-here@postgres:5432/gymsyncpro?schema=public
+
+# Backend
+NODE_ENV=production
+PORT=5000
+SESSION_SECRET=your-very-secure-session-secret-here
+
+# Email (Resend)
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=your-email@yourdomain.com
+
+# Frontend
+NEXT_PUBLIC_API_URL=http://your-domain.com
+
+# CORS
+ALLOWED_ORIGINS=http://your-domain.com,https://your-domain.com
 ```
 
-Jika variabel ini belum diset, endpoint akan merespon 503 dan tombol di Admin tetap ada namun pengiriman akan gagal dengan pesan yang ramah.
+**Generate secure secrets:**
+```bash
+# Generate session secret
+openssl rand -base64 32
 
-Catatan: Sistem akan menormalkan nomor ke format E.164 Indonesia (+62...). Pastikan data `phone` member valid.
+# Generate database password
+openssl rand -base64 24
+```
 
-### Push Notifications (Opsional)
+### 2.3 Set Up SSL (Recommended)
 
-Jika ingin mengaktifkan push notifications:
+For production, use Let's Encrypt with Certbot:
 
 ```bash
-# Generate VAPID keys
-npx web-push generate-vapid-keys
+# Install Certbot
+sudo apt install certbot python3-certbot-nginx -y
+
+# Obtain SSL certificate
+sudo certbot certonly --standalone -d your-domain.com
+
+# Certificates will be saved to:
+# /etc/letsencrypt/live/your-domain.com/fullchain.pem
+# /etc/letsencrypt/live/your-domain.com/privkey.pem
 ```
 
-Tambahkan ke `.env`:
+Update nginx configuration to use SSL certificates.
 
-```env
-VAPID_PUBLIC_KEY=<public-key>
-VAPID_PRIVATE_KEY=<private-key>
-VAPID_MAILTO=mailto:admin@yourdomain.com
-```
+## Step 3: Configure Nginx
 
-### Payment Gateway Setup
+### 3.1 Update Nginx Configuration
 
-#### Stripe
+Edit `nginx/conf.d/default.conf`:
 
-1. Daftar di https://dashboard.stripe.com
-2. Ambil API keys dari https://dashboard.stripe.com/apikeys
-3. Setup webhook untuk production
+1. Replace `your-domain.com` with your actual domain
+2. Uncomment HTTPS server block
+3. Update SSL certificate paths if using custom certificates
 
-#### Midtrans
+### 3.2 Update Domain in Docker Compose
 
-1. Daftar di https://dashboard.midtrans.com
-2. Ambil Server Key dan Client Key dari Settings > Access Keys
-3. Set `MIDTRANS_ENVIRONMENT=production` untuk live transactions
+Edit `docker-compose.yml` nginx service if needed.
 
-## 📊 Monitoring & Maintenance
+## Step 4: Deploy Application
 
-### Check Status Aplikasi
+### 4.1 Build and Start Services
 
 ```bash
-# Dengan PM2
-pm2 status
-pm2 logs idachi-fitness
+# Make deploy script executable
+chmod +x scripts/deploy.sh
 
-# Dengan systemd
-sudo systemctl status idachi-fitness
-sudo journalctl -u idachi-fitness -f
+# Run deployment script
+./scripts/deploy.sh
 ```
 
-### Database Backup
+Or manually:
 
 ```bash
-# Backup database
-pg_dump -U username -d idachi_fitness > backup_$(date +%Y%m%d).sql
+# Build images
+docker-compose build
 
-# Restore database
-psql -U username -d idachi_fitness < backup_20231103.sql
+# Start services
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
 ```
 
-### Update Aplikasi
+### 4.2 Run Database Migrations
 
 ```bash
-# Pull latest code
-git pull origin main
-
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Restart
-pm2 restart idachi-fitness
+docker-compose exec backend npx prisma migrate deploy
 ```
 
-## ❓ Troubleshooting
-
-### Error: "RESEND_API_KEY environment variable is required"
-
-**Solusi**: Pastikan file `.env` berisi `RESEND_API_KEY` yang valid.
-
-### Error: "Database connection failed"
-
-**Solusi**: 
-- Cek `DATABASE_URL` di file `.env`
-- Pastikan PostgreSQL service running: `sudo systemctl status postgresql`
-- Test koneksi: `psql -d <DATABASE_URL>`
-
-### Error: "Port 5000 already in use"
-
-**Solusi**: 
-- Ganti `PORT` di file `.env` ke port lain (misal: 3000)
-- Atau stop aplikasi yang menggunakan port 5000
-
-### Email tidak terkirim
-
-**Solusi**:
-- Pastikan `RESEND_API_KEY` valid
-- Verifikasi domain di Resend dashboard
-- Check logs untuk error detail
-
-## 🔐 Security Checklist
-
-- [ ] `SESSION_SECRET` diset dengan random string yang kuat
-- [ ] `NODE_ENV=production` di environment production
-- [ ] Database menggunakan password yang kuat
-- [ ] Firewall aktif dan hanya port yang diperlukan terbuka
-- [ ] SSL/HTTPS aktif menggunakan Let's Encrypt
-- [ ] Resend domain terverifikasi
-- [ ] `ADMIN_SECRET_KEY` diganti dari default value
-- [ ] File `.env` tidak di-commit ke git (ada di `.gitignore`)
-
-## 📝 Catatan Penting
-
-1. **File yang Tidak Digunakan**: File `server/replitAuth.ts.disabled` adalah backup dari sistem autentikasi Replit yang sudah tidak digunakan. Bisa dihapus jika tidak diperlukan.
-
-2. **Vite Plugins**: Plugins `@replit/vite-plugin-*` hanya akan aktif jika `REPL_ID` environment variable ada. Di server sendiri, plugins ini tidak akan load - tidak masalah.
-
-3. **Database Migration**: Gunakan `npm run db:push` untuk sync schema. Untuk production yang lebih aman, pertimbangkan menggunakan migration tools.
-
-4. **Upload Gambar & Static Files**:
-   - Endpoint admin untuk upload gambar tersedia di `POST /api/admin/upload-image` (hanya admin).
-   - Berkas disimpan ke folder `uploads/` di root proyek. Server secara otomatis melayani file tersebut melalui path `/uploads/...`.
-   - Pastikan disk memiliki izin tulis pada direktori aplikasi (khususnya folder `uploads`).
-
-4. **Email Development**: Tanpa `RESEND_FROM_EMAIL`, sistem akan fallback ke "onboarding@resend.dev" yang hanya untuk development.
-
-## 💡 Tips Optimization
-
-### 1. Enable Gzip & Brotli Compression di Nginx
-
-Edit file nginx config (`/etc/nginx/nginx.conf` atau site config):
-
-```nginx
-# Gzip Settings
-gzip on;
-gzip_vary on;
-gzip_proxied any;
-gzip_comp_level 6;
-gzip_types text/plain text/css text/xml text/javascript 
-           application/json application/javascript application/xml+rss 
-           application/rss+xml font/truetype font/opentype 
-           application/vnd.ms-fontobject image/svg+xml;
-
-# Brotli Settings (jika modul tersedia)
-brotli on;
-brotli_comp_level 6;
-brotli_types text/plain text/css text/xml text/javascript 
-             application/json application/javascript application/xml+rss 
-             application/rss+xml font/truetype font/opentype 
-             application/vnd.ms-fontobject image/svg+xml;
-```
-
-Restart Nginx:
-```bash
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-### 2. Setup CDN untuk Static Assets
-
-#### Opsi A: Menggunakan Cloudflare (Gratis)
-
-1. **Signup di Cloudflare**:
-   - Daftar di https://cloudflare.com
-   - Tambahkan domain Anda
-   - Update nameserver domain ke Cloudflare
-
-2. **Enable Cache Everything**:
-   - Dashboard > Rules > Page Rules
-   - Create Rule: `yourdomain.com/dist/*` → Cache Level: Cache Everything
-   - Create Rule: `yourdomain.com/*.js` → Cache Level: Cache Everything
-   - Create Rule: `yourdomain.com/*.css` → Cache Level: Cache Everything
-
-3. **Enable Auto Minify**:
-   - Speed > Optimization
-   - Enable Auto Minify untuk JS, CSS, dan HTML
-
-4. **Enable Brotli**:
-   - Speed > Optimization
-   - Enable Brotli compression
-
-#### Opsi B: Menggunakan CDN Terpisah (BunnyCDN, KeyCDN, dll)
-
-1. **Setup Pull Zone**:
-   ```
-   Origin URL: https://yourdomain.com
-   Pull Zone URL: https://cdn.yourdomain.com
-   ```
-
-2. **Update Build Output untuk CDN**:
-   
-   Buat file `vite.config.cdn.ts`:
-   ```typescript
-   import { defineConfig } from "vite";
-   import react from "@vitejs/plugin-react";
-   import path from "path";
-   
-   export default defineConfig({
-     plugins: [react()],
-     base: "https://cdn.yourdomain.com/",
-     build: {
-       outDir: "dist/public",
-       assetsDir: "assets",
-       rollupOptions: {
-         output: {
-           manualChunks: {
-             vendor: ['react', 'react-dom'],
-             ui: ['@radix-ui/react-dialog', '@radix-ui/react-toast']
-           }
-         }
-       }
-     }
-   });
-   ```
-
-3. **Build dengan CDN Config**:
-   ```bash
-   vite build --config vite.config.cdn.ts
-   ```
-
-4. **Upload `dist/public` ke CDN Origin**
-
-### 3. Cache Control Headers di Nginx
-
-```nginx
-location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-}
-
-location /dist/ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-}
-
-location /assets/ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-}
-```
-
-### 4. Database Connection Pooling
-
-Update connection di `.env`:
-```env
-DATABASE_URL=postgresql://user:pass@host:5432/db?pool_timeout=60&connect_timeout=10
-```
-
-### 5. Monitor Memory Usage
+### 4.3 Seed Database (Optional)
 
 ```bash
-# Dengan PM2
-pm2 monit
-
-# Setup PM2 monitoring dashboard
-pm2 install pm2-server-monit
+docker-compose exec backend npm run db:seed
 ```
 
-### 6. Automated Database Backups
+## Step 5: Verify Deployment
 
-Buat cron job untuk backup otomatis:
+### 5.1 Check Services
+
 ```bash
-# Edit crontab
-crontab -e
+# Check container status
+docker-compose ps
 
-# Tambahkan (backup setiap hari jam 2 pagi)
-0 2 * * * pg_dump -U username -d idachi_fitness > /backup/db_$(date +\%Y\%m\%d).sql
+# Check backend health
+curl http://localhost/api/health
+
+# Check frontend
+curl http://localhost/
 ```
 
-### 7. Production Build Optimization
+### 5.2 View Logs
 
-Install compression plugin:
 ```bash
-npm install -D vite-plugin-compression
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f nginx
 ```
 
-Saat build, assets akan otomatis di-compress menjadi `.gz` dan `.br` files.
+## Step 6: Maintenance
 
-Nginx akan otomatis serve compressed version jika browser support.
+### 6.1 Update Application
 
-## 📞 Bantuan
+```bash
+# Pull latest changes
+git pull
 
-Jika mengalami kendala dalam deployment, check:
-- Application logs: `pm2 logs idachi-fitness`
-- Nginx logs: `/var/log/nginx/error.log`
-- PostgreSQL logs: `/var/log/postgresql/`
+# Rebuild and restart
+docker-compose down
+docker-compose build
+docker-compose up -d
 
----
+# Run migrations if schema changed
+docker-compose exec backend npx prisma migrate deploy
+```
 
-**Deployment berhasil?** Akses aplikasi di `https://yourdomain.com` dan test semua fitur!
+### 6.2 Backup Database
+
+```bash
+# Create backup
+docker-compose exec postgres pg_dump -U gymsyncpro gymsyncpro > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restore backup
+docker-compose exec -T postgres psql -U gymsyncpro gymsyncpro < backup.sql
+```
+
+### 6.3 Monitor Resources
+
+```bash
+# Check container resource usage
+docker stats
+
+# Check disk usage
+df -h
+
+# Check Docker disk usage
+docker system df
+```
+
+## Troubleshooting
+
+### Issue: Services won't start
+
+```bash
+# Check logs
+docker-compose logs
+
+# Check if ports are in use
+sudo netstat -tulpn | grep -E ':(80|443|3000|5000|5432)'
+```
+
+### Issue: Database connection errors
+
+```bash
+# Check database container
+docker-compose logs postgres
+
+# Test database connection
+docker-compose exec backend npx prisma db pull
+```
+
+### Issue: Nginx configuration errors
+
+```bash
+# Test nginx configuration
+docker-compose exec nginx nginx -t
+
+# Reload nginx
+docker-compose exec nginx nginx -s reload
+```
+
+### Issue: Out of disk space
+
+```bash
+# Clean up Docker
+docker system prune -a
+
+# Remove unused volumes
+docker volume prune
+```
+
+## Security Checklist
+
+- [ ] Changed all default passwords
+- [ ] Set strong SESSION_SECRET
+- [ ] Configured SSL certificates
+- [ ] Set up firewall rules
+- [ ] Enabled automatic security updates
+- [ ] Configured fail2ban (optional)
+- [ ] Set up regular backups
+- [ ] Limited SSH access (disable root login)
+- [ ] Set up monitoring and alerts
+
+## Performance Optimization
+
+1. **Enable Gzip compression** (already configured in nginx)
+2. **Set up CDN** for static assets
+3. **Configure caching** in nginx
+4. **Enable database connection pooling**
+5. **Set up Redis** for session storage (optional)
+6. **Configure log rotation**
+
+## Scaling
+
+For horizontal scaling:
+
+1. Use a load balancer (e.g., AWS ELB, DigitalOcean Load Balancer)
+2. Run multiple backend instances
+3. Use managed PostgreSQL database
+4. Set up Redis for session storage
+5. Configure shared file storage (S3, etc.)
+
+## Support
+
+For issues during deployment:
+1. Check logs: `docker-compose logs -f`
+2. Verify environment variables
+3. Check network connectivity
+4. Review firewall rules
+5. Open an issue on GitHub
