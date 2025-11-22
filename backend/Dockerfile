@@ -3,7 +3,8 @@ FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# Install system dependencies for Prisma
+RUN apk add --no-cache libc6-compat openssl1.1-compat
 WORKDIR /app
 
 # Copy package files
@@ -16,6 +17,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY backend/ ./
 
+# Set Prisma binary target for Alpine Linux
+ENV PRISMA_CLI_BINARY_TARGETS=linux-musl
+
 # Generate Prisma Client
 RUN npx prisma generate
 
@@ -25,6 +29,9 @@ RUN npm run build
 # Production image
 FROM base AS runner
 WORKDIR /app
+
+# Install runtime dependencies for Prisma
+RUN apk add --no-cache openssl1.1-compat
 
 ENV NODE_ENV production
 
@@ -42,9 +49,9 @@ RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app
 
 USER nodejs
 
-EXPOSE 5000
+EXPOSE 4000
 
-ENV PORT=5000
+ENV PORT=4000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "dist/index.js"]
