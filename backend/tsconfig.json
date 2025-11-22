@@ -11,9 +11,8 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
-    "types": ["node"]
+    "types": ["node", "pg", "connect-pg-simple"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
-
