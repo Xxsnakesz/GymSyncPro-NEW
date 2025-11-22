@@ -50,6 +50,7 @@ model User {
   oneTimeQrCodes        OneTimeQrCode[]
   notifications         Notification[]
   pushSubscriptions     PushSubscription[]
+  activityLogs          ActivityLog[]
 
   @@map("users")
 }
@@ -321,5 +322,27 @@ model Promotion {
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("promotions")
+}
+
+model ActivityLog {
+  id          String    @id @default(uuid())
+  userId      String?   @map("user_id")  // Optional - some activities might be system-level
+  action      String    // The type of action performed
+  entity      String    // What was affected (user, membership, class, etc.)
+  entityId    String?   @map("entity_id") // ID of the affected entity
+  description String    @db.Text // Human-readable description of the activity
+  metadata    Json?     // Additional data about the activity
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @db.Text @map("user_agent")
+  timestamp   DateTime  @default(now())
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User?     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+  @@index([timestamp])
+  @@map("activity_logs")
 }
 
