@@ -1,10 +1,14 @@
 # Backend Dockerfile
-FROM node:20-alpine AS base
+# Use Debian-based Node.js for better Prisma compatibility
+FROM node:20-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
 # Install system dependencies for Prisma
-RUN apk add --no-cache libc6-compat openssl1.1-compat
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Copy package files
@@ -17,8 +21,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY backend/ ./
 
-# Set Prisma binary target for Alpine Linux
-ENV PRISMA_CLI_BINARY_TARGETS=linux-musl
+# Set Prisma binary target for Debian
+ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
 
 # Generate Prisma Client
 RUN npx prisma generate
@@ -31,7 +35,10 @@ FROM base AS runner
 WORKDIR /app
 
 # Install runtime dependencies for Prisma
-RUN apk add --no-cache openssl1.1-compat
+RUN apt-get update && apt-get install -y \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV production
 
